@@ -418,6 +418,18 @@ Examples include:
 
 Custom validation is implemented through validator plugins.
 
+Version 1 supports declarative `ValidateSet`, `ValidateRange`, and `ValidatePattern` objects:
+
+```powershell
+Validations = @(
+    @{ Type = "ValidateSet"; Values = @("Build", "Test") }
+    @{ Type = "ValidateRange"; Minimum = 1; Maximum = 10 }
+    @{ Type = "ValidatePattern"; Pattern = "^[a-z]+$" }
+)
+```
+
+The generator validates these definitions and renders them as native PowerShell parameter attributes.
+
 ---
 
 # Extensibility

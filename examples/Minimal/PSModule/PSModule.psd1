@@ -29,6 +29,10 @@
                     Type      = 'string'
                     Mandatory = $true
 
+                    Validations = @(
+                        @{ Type = 'ValidatePattern'; Pattern = '^.{1,100}$' }
+                    )
+
                     Mappings = @(
                         @{
                             Type = 'Environment'
