@@ -187,6 +187,24 @@ Describe 'Build-ContainerModule command validation' {
         @{ Name = 'invoke-example' }
     )
 }
+
+Describe 'Container module identity validation' {
+    It 'rejects an unsafe module name' {
+        $specificationPath = Join-Path $TestDrive 'UnsafeModuleName.psd1'
+        Set-Content -LiteralPath $specificationPath -Value "@{ ModuleName = '../Unsafe'; Commands = @() }"
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'ModuleName' property must be*"
+    }
+
+    It 'rejects an invalid module version' {
+        $specificationPath = Join-Path $TestDrive 'InvalidModuleVersion.psd1'
+        Set-Content -LiteralPath $specificationPath -Value "@{ ModuleVersion = 'latest'; Commands = @() }"
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'ModuleVersion' property must be a valid version string*"
+    }
+}
 '@
 
         { Build-ContainerModule -Specification './Specification.psd1' } |
@@ -511,6 +529,8 @@ Describe 'Container module object model' {
             $model = ConvertTo-ContainerModuleModel -Specification @{}
 
             $model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+            $model.ModuleName | Should -Be 'PSModule'
+            $model.ModuleVersion | Should -Be '0.1.0'
             [object]::ReferenceEquals($null, $model.Commands) | Should -BeFalse
             $model.Commands.Count | Should -Be 0
         }
@@ -639,6 +659,35 @@ Describe 'Container module command source generation' {
 
         $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
         [System.IO.File]::ReadAllText($sourcePath) | Should -BeExactly $firstContent
+    }
+}
+
+Describe 'Container module loader generation' {
+    It 'writes an importable loader that exports generated commands' {
+        $specificationPath = Join-Path $TestDrive 'Loader.psd1'
+        $outputPath = Join-Path $TestDrive 'loader-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'ExampleContainer'
+    ModuleVersion = '1.2.3'
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @() }
+    )
+}
+'@
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        $loaderPath = Join-Path $outputPath 'ExampleContainer.psm1'
+        $module = Import-Module $loaderPath -Force -PassThru
+
+        try {
+            $module.Name | Should -Be 'ExampleContainer'
+            Get-Command Invoke-Example -Module ExampleContainer | Should -Not -BeNullOrEmpty
+            { Invoke-Example } | Should -Throw -ExceptionType ([System.NotImplementedException])
+        }
+        finally {
+            Remove-Module ExampleContainer -Force
+        }
     }
 }
 

@@ -102,11 +102,12 @@ Generated artifacts currently include:
 
 ```text
 artifacts/PSModule/
+├── <ModuleName>.psm1
 ├── Metadata/model.json
 └── Public/<CommandName>.ps1
 ```
 
-Public command files contain the declared parameter blocks and stop at the not-yet-implemented runtime invocation boundary. Module manifests and Docker invocation will be added in later slices.
+The generated loader imports and exports every public command. Public command files contain the declared parameter blocks and stop at the not-yet-implemented runtime invocation boundary. Module manifests and Docker invocation will be added in later slices.
 
 ### Test another local repository
 
