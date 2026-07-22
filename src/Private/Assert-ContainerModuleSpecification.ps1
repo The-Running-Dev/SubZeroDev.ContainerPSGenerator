@@ -10,6 +10,7 @@ param (
     Assert-ContainerModuleCommands -Specification $Specification
     Assert-ContainerModuleParameters -Specification $Specification
     Assert-ContainerModuleObjectIdentities -Specification $Specification
+    Assert-ContainerModuleParameterCompletions -Specification $Specification
     Assert-ContainerModuleParameterValidations -Specification $Specification
     Assert-ContainerModuleMappings -Specification $Specification
     Assert-ContainerModuleNamedMappings -Specification $Specification

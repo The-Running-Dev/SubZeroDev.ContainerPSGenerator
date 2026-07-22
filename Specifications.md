@@ -447,6 +447,16 @@ Extension points include:
 
 External PowerShell files are preferred over embedded script blocks.
 
+Version 1 supports declarative static argument completion through typed providers:
+
+```powershell
+Completions = @(
+    @{ Type = "Static"; Values = @("Build", "Test") }
+)
+```
+
+Static providers require unique, non-empty string values and render PowerShell's native `ArgumentCompletions` attribute. Multiple static providers on a parameter are combined in declaration order.
+
 ---
 
 # Help

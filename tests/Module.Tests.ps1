@@ -963,6 +963,61 @@ Describe 'Resource limit and secret mappings' {
     }
 }
 
+Describe 'Static argument completion' {
+    It 'normalizes, persists, renders, and returns static completion values' {
+        $specificationPath = Join-Path $TestDrive 'Completions.psd1'
+        $outputPath = Join-Path $TestDrive 'completion-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'CompletionExample'
+    Commands = @(@{ Name = 'Invoke-CompletionExample'; Parameters = @(
+        @{ Name = 'Mode'; Type = 'string'; Completions = @(
+            @{ Type = 'Static'; Values = @('Build', 'Benchmark') }
+            @{ Type = 'Static'; Values = @('Test') }
+        ) }
+    ) })
+}
+'@
+
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $source = Get-Content -LiteralPath (Join-Path $outputPath 'Public' 'Invoke-CompletionExample.ps1') -Raw
+        $metadata = Get-Content -LiteralPath (Join-Path $outputPath 'Metadata/model.json') -Raw | ConvertFrom-Json
+        $module = Import-Module (Join-Path $outputPath 'CompletionExample.psd1') -Force -PassThru
+        try {
+            $inputText = 'Invoke-CompletionExample -Mode B'
+            $matches = [System.Management.Automation.CommandCompletion]::CompleteInput(
+                $inputText, $inputText.Length, $null
+            ).CompletionMatches.CompletionText
+
+            $model.Commands[0].Parameters[0].Completions.Count | Should -Be 2
+            $model.Commands[0].Parameters[0].Completions[0].Values | Should -Be @('Build', 'Benchmark')
+            $metadata.Commands[0].Parameters[0].Completions[1].Values | Should -Be @('Test')
+            $source | Should -Match "\[ArgumentCompletions\('Build', 'Benchmark', 'Test'\)\]"
+            $matches | Should -Be @('Build', 'Benchmark')
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed and duplicate static completion definitions' {
+        $scalarPath = Join-Path $TestDrive 'ScalarCompletions.psd1'
+        $unsupportedPath = Join-Path $TestDrive 'UnsupportedCompletion.psd1'
+        $emptyValuesPath = Join-Path $TestDrive 'EmptyCompletionValues.psd1'
+        $duplicatePath = Join-Path $TestDrive 'DuplicateCompletionValues.psd1'
+        Set-Content $scalarPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Completions = @{ Type = 'Static'; Values = @('One') } }) }) }"
+        Set-Content $unsupportedPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Completions = @(@{ Type = 'Script' }) }) }) }"
+        Set-Content $emptyValuesPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Completions = @(@{ Type = 'Static'; Values = @() }) }) }) }"
+        Set-Content $duplicatePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Completions = @(@{ Type = 'Static'; Values = @('One', 'one') }) }) }) }"
+
+        { Test-ContainerModuleSpecification $scalarPath } | Should -Throw -ExpectedMessage "*'Completions'*must be an array*"
+        { Test-ContainerModuleSpecification $unsupportedPath } | Should -Throw -ExpectedMessage "*Completion type 'Script'*not supported*"
+        { Test-ContainerModuleSpecification $emptyValuesPath } | Should -Throw -ExpectedMessage "*Static completion*non-empty string array*"
+        { Test-ContainerModuleSpecification $duplicatePath } | Should -Throw -ExpectedMessage "*Completion value 'one'*defined more than once*"
+    }
+}
+
 Describe 'Parameter validation attributes' {
     It 'normalizes and renders supported native validation attributes' {
         $specificationPath = Join-Path $TestDrive 'Validations.psd1'

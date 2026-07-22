@@ -11,6 +11,18 @@ function ConvertTo-ContainerModuleModel {
                 $parameters = @(
                     if ($command.Contains('Parameters')) {
                         foreach ($parameter in $command['Parameters']) {
+                            $completions = @(
+                                if ($parameter.Contains('Completions')) {
+                                    foreach ($completion in $parameter['Completions']) {
+                                        [pscustomobject] @{
+                                            PSTypeName = 'SubZeroDev.ContainerPSGenerator.Model.Completion'
+                                            Type       = $completion['Type']
+                                            Values     = @($completion['Values'])
+                                            Definition = $completion
+                                        }
+                                    }
+                                }
+                            )
                             $validations = @(
                                 if ($parameter.Contains('Validations')) {
                                     foreach ($validation in $parameter['Validations']) {
@@ -41,6 +53,7 @@ function ConvertTo-ContainerModuleModel {
                                 Description = $parameter['Description']
                                 Type       = $parameter['Type']
                                 Mandatory  = if ($parameter.Contains('Mandatory')) { $parameter['Mandatory'] } else { $false }
+                                Completions = $completions
                                 Validations = $validations
                                 Mappings   = $mappings
                                 Definition = $parameter
