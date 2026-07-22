@@ -1,0 +1,571 @@
+# Repository-Generated PowerShell Container Modules
+
+> **Status:** Version 1 Specification (Working Draft)  
+> **Working Title:** Container Module Generator (CMG)  
+> **Target Platform:** PowerShell 7+, Docker
+
+---
+
+# Purpose
+
+Container Module Generator (CMG) generates repository-specific PowerShell modules for containerized applications.
+
+Instead of exposing Docker commands directly, repositories define a PowerShell-oriented specification describing their public interface. During the normal repository build, CMG generates a complete, self-contained PowerShell module which is embedded into the resulting container image.
+
+End users install the module directly from the image and interact with the application through ordinary PowerShell commands rather than raw `docker run` invocations.
+
+The repository remains the single source of truth.
+
+---
+
+# Design Principles
+
+Version 1 is guided by the following principles:
+
+- Use native PowerShell concepts wherever practical.
+- Prefer convention over configuration.
+- Generate complete PowerShell source code.
+- Produce deterministic output.
+- Keep the specification declarative by default.
+- Allow extensibility through explicit plugin mechanisms.
+- Favor clarity over minimizing duplication.
+- Keep build-time intelligence separate from runtime execution.
+
+---
+
+# High-Level Architecture
+
+```text
+Repository
+│
+├── PSModule/
+│   └── PSModule.psd1
+│
+├── Source
+│
+└── Build
+      │
+      ▼
+Build-ContainerModule
+      │
+      ▼
+Generated PowerShell Module
+      │
+      ▼
+Embedded in Docker Image
+      │
+      ▼
+Install-ContainerModule
+      │
+      ▼
+Imported locally
+      │
+      ▼
+Native PowerShell Experience
+```
+
+---
+
+# Repository Layout
+
+Default specification location:
+
+```text
+PSModule/
+└── PSModule.psd1
+```
+
+Alternative specification:
+
+```powershell
+Build-ContainerModule -Specification ./config/MyModule.psd1
+```
+
+---
+
+# Generated Output
+
+Default output:
+
+```text
+artifacts/
+└── PSModule/
+    BuildAgent.psd1
+    BuildAgent.psm1
+
+    Public/
+    Private/
+    Classes/
+    Completions/
+    en-US/
+    Metadata/
+```
+
+Only required directories are generated.
+
+Output location may be overridden:
+
+```powershell
+Build-ContainerModule -Output ./dist
+```
+
+Each build overwrites previously generated output.
+
+---
+
+# Build Model
+
+The generated module is produced during the normal repository build.
+
+Repository authors generally do not execute the generator manually.
+
+Typical pipeline:
+
+```text
+Build Application
+        │
+Build-ContainerModule
+        │
+Copy module into image
+        │
+Docker Build
+        │
+Publish
+```
+
+---
+
+# Generated Code
+
+CMG generates complete PowerShell source code.
+
+Generated modules are self-contained.
+
+They include:
+
+- Public cmdlets
+- Private helper functions
+- Parameter declarations
+- Validation
+- Completion
+- Help
+- Docker invocation
+- Preview
+- Diagnostics
+- Error handling
+
+The generated module does not depend on a shared runtime library.
+
+---
+
+# Internal Generator Architecture
+
+CMG constructs a complete internal object model before rendering PowerShell.
+
+Pipeline:
+
+```text
+Repository
+      │
+Inspectors
+      │
+Object Model
+      │
+Validators
+      │
+Generators
+      │
+Templates
+      │
+Packaging
+```
+
+PowerShell is rendered from templates using the object model.
+
+---
+
+# Plugin Architecture
+
+Every processing stage is plugin-based.
+
+Pipeline stages include:
+
+- Inspectors
+- Validators
+- Object Model Processors
+- Code Generators
+- Template Renderers
+- Runtime Adapters
+- Packaging Providers
+
+Plugins communicate through the shared object model.
+
+The core engine is responsible for:
+
+- Plugin discovery
+- Ordering
+- Diagnostics
+- Pipeline orchestration
+
+---
+
+# Plugin Discovery
+
+Plugins are automatically discovered.
+
+Each plugin implements the appropriate plugin contract (interface or equivalent).
+
+Execution order is determined by filename prefix.
+
+Example:
+
+```text
+00.DockerfileInspector.ps1
+05.ComposeInspector.ps1
+10.ReadmeInspector.ps1
+20.NukeInspector.ps1
+90.Validation.ps1
+```
+
+Plugins execute in ascending lexical order.
+
+---
+
+# Repository Inspection
+
+Repository inspection occurs through independent inspector plugins.
+
+Inspectors may analyze:
+
+- Dockerfiles
+- Docker Compose
+- PowerShell
+- README
+- GitHub Actions
+- NUKE
+- .NET projects
+- Node projects
+- Configuration schemas
+- OpenAPI
+- Additional technologies
+
+New inspectors are added simply by placing them into the appropriate plugin directory.
+
+---
+
+# Build Command
+
+The build process exposes a single command:
+
+```powershell
+Build-ContainerModule
+```
+
+Pipeline stages are internal implementation details.
+
+Debugging and diagnostics are provided through dedicated developer commands rather than build switches.
+
+---
+
+# Cross-Platform Support
+
+Generated modules execute correctly on all supported platforms.
+
+The generator handles:
+
+- Path normalization
+- Home directory resolution
+- Environment variables
+- Filesystem differences
+- Process invocation
+- Runtime detection
+
+Repository authors should not write platform-specific specifications whenever practical.
+
+---
+
+# Container Module Location
+
+Generated modules are embedded inside every compliant image at:
+
+```text
+/PSModule
+```
+
+Install-ContainerModule retrieves the module from this location.
+
+Local installation defaults to:
+
+```text
+~/PSModule
+```
+
+Override:
+
+```powershell
+Install-ContainerModule -Destination ~/Modules
+```
+
+---
+
+# Repository Specification
+
+The repository specification uses PowerShell PSD1.
+
+Collections are represented as arrays of typed objects.
+
+The specification favors explicit objects over nested hashtables.
+
+---
+
+# Commands
+
+Commands are defined as arrays of objects.
+
+```powershell
+Commands = @(
+    @{
+        Name = "Invoke-BuildAgent"
+        Description = "Build repository"
+
+        Parameters = @(...)
+    }
+)
+```
+
+---
+
+# Parameters
+
+Parameters are arrays of typed objects.
+
+```powershell
+Parameters = @(
+    @{
+        Name = "Repository"
+        Type = "DirectoryInfo"
+        Mandatory = $true
+    }
+)
+```
+
+---
+
+# PowerShell Types
+
+The specification uses native PowerShell types.
+
+Examples include:
+
+- string
+- string[]
+- bool
+- switch
+- int
+- long
+- double
+- decimal
+- Guid
+- Version
+- Uri
+- DateTime
+- TimeSpan
+- FileInfo
+- DirectoryInfo
+- SecureString
+- PSCredential
+- Enumerations
+- Custom classes
+
+No custom type system is introduced.
+
+---
+
+# Validation
+
+Native PowerShell validation attributes are preferred.
+
+Examples include:
+
+- ValidateSet
+- ValidateRange
+- ValidateLength
+- ValidatePattern
+- ValidateCount
+- ValidateScript
+
+Custom validation is implemented through validator plugins.
+
+---
+
+# Extensibility
+
+The specification is declarative by default.
+
+Where declarative metadata cannot express required behavior, explicit PowerShell extension points may be referenced.
+
+Extension points include:
+
+- Validation
+- Completion
+- Discovery
+- Repository-specific behaviors
+
+External PowerShell files are preferred over embedded script blocks.
+
+---
+
+# Help
+
+The specification contains:
+
+- Synopsis
+- Description
+- Parameter descriptions
+- Notes
+- Basic examples
+
+Long-form documentation may be supplied through Markdown.
+
+---
+
+# Examples
+
+Examples are structured objects.
+
+The generator renders them into:
+
+- Get-Help
+- Documentation
+- Tutorials
+
+Future versions may reuse them for testing and documentation generation.
+
+---
+
+# Parameter Mappings
+
+Mappings are first-class typed objects.
+
+```powershell
+Mappings = @(
+    @{
+        Type = "Mount"
+        Target = "/repository"
+        Access = "ReadOnly"
+    }
+
+    @{
+        Type = "Environment"
+        Name = "BUILD_REPOSITORY"
+    }
+
+    @{
+        Type = "Argument"
+        Name = "--repository"
+    }
+)
+```
+
+Supported mappings include:
+
+- Arguments
+- Environment variables
+- Bind mounts
+- Named volumes
+- Ports
+- Working directory
+- Resource limits
+- Devices
+- GPU
+- Secrets
+- Runtime options
+
+A parameter may define multiple mappings.
+
+---
+
+# Typed Objects
+
+Objects supporting multiple variants include a `Type` property.
+
+Examples include:
+
+- Parameter mappings
+- Completion providers
+- Runtime behaviors
+- Packaging definitions
+
+Objects whose type is implied by their containing collection may omit `Type`.
+
+---
+
+# Object Identity
+
+Major specification objects may define an optional `Id`.
+
+Ids provide stable identifiers for:
+
+- Validation
+- Diagnostics
+- Cross references
+- Plugin communication
+- Future schema evolution
+
+---
+
+# Runtime Model
+
+The specification describes runtime requirements rather than Docker syntax.
+
+Docker is the initial runtime.
+
+Future runtime adapters (for example, Podman) should consume the same mapping model.
+
+---
+
+# Simplicity
+
+Version 1 intentionally avoids:
+
+- Object inheritance
+- Templates
+- Object composition
+- Reuse mechanisms
+
+Objects remain explicit and self-contained.
+
+---
+
+# Deferred to Phase 2
+
+Topics intentionally deferred include:
+
+- Plugin SDK
+- Third-party plugin packaging
+- Stable plugin interfaces
+- Plugin versioning
+- Extension model refinement
+- Object reuse mechanisms
+- Additional runtime adapters
+- Advanced documentation generation
+
+---
+
+# Success Criteria
+
+The project succeeds when a repository author can define a PowerShell specification, build the repository, embed the generated module into the image, and allow end users to install it directly from that image.
+
+Users should be able to execute:
+
+```powershell
+Install-ContainerModule ghcr.io/the-running-dev/build-agent:latest
+
+Invoke-BuildAgent -Repository . -Task Build
+
+Get-Help Invoke-BuildAgent
+```
+
+without manually constructing `docker run` commands.
+
+The repository remains the authoritative definition of the public interface while the generated module provides a native PowerShell experience.
