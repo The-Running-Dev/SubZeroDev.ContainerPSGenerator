@@ -521,6 +521,24 @@ Describe 'Mount mapping validation' {
         { Test-ContainerModuleSpecification -Specification $specificationPath } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Access' property for Mount mapping*must be a non-empty string*"
     }
+
+    It 'rejects an unsupported Mount mapping access mode' {
+        $specificationPath = Join-Path $TestDrive 'InvalidMountAccess.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Repository'; Type = 'DirectoryInfo'; Mappings = @(
+                @{ Type = 'Mount'; Target = '/repository'; Access = 'OwnerOnly' }
+            ) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must be 'ReadOnly' or 'ReadWrite'*"
+    }
 }
 
 Describe 'Container module object model' {
@@ -654,7 +672,7 @@ Describe 'Container module command source generation' {
         $parseErrors | Should -BeNullOrEmpty
         $firstContent | Should -Match 'function Invoke-Example'
         $firstContent | Should -Match '\[Parameter\(Mandatory = \$true\)\]'
-        $firstContent | Should -Match '\[DirectoryInfo\] \$Repository,'
+        $firstContent | Should -Match '\[System\.IO\.DirectoryInfo\] \$Repository,'
         $firstContent | Should -Match '\[string\[\]\] \$Tags'
         $firstContent | Should -Not -Match "`r`n"
 
@@ -858,6 +876,92 @@ Describe 'Docker runtime command generation' {
         finally {
             Remove-Item -Path Function:\docker -Force
             Remove-Variable -Name capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+}
+
+Describe 'Docker mount and error generation' {
+    It 'maps read-only and read-write bind mounts before the image' {
+        $specificationPath = Join-Path $TestDrive 'DockerMounts.psd1'
+        $outputPath = Join-Path $TestDrive 'docker-mount-output'
+        $readOnlyPath = Join-Path $TestDrive 'source-one'
+        $readWritePath = Join-Path $TestDrive 'source-two'
+        New-Item -Path $readOnlyPath -ItemType Directory -Force | Out-Null
+        New-Item -Path $readWritePath -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'MountExample'
+    ContainerImage = 'example/mount-tool'
+    Commands = @(@{ Name = 'Invoke-MountExample'; Parameters = @(
+        @{ Name = 'InputPath'; Type = 'DirectoryInfo'; Mappings = @(
+            @{ Type = 'Mount'; Target = '/input'; Access = 'ReadOnly' }
+        ) }
+        @{ Name = 'OutputPath'; Type = 'DirectoryInfo'; Mappings = @(
+            @{ Type = 'Mount'; Target = '/output'; Access = 'ReadWrite' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'MountExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args) }
+        try {
+            Invoke-MountExample -InputPath $readOnlyPath -OutputPath $readWritePath
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm',
+                '--mount', "type=bind,source=$([System.IO.Path]::GetFullPath($readOnlyPath)),target=/input,readonly",
+                '--mount', "type=bind,source=$([System.IO.Path]::GetFullPath($readWritePath)),target=/output",
+                'example/mount-tool'
+            )
+        }
+        finally {
+            Remove-Item -Path Function:\docker -Force
+            Remove-Variable -Name capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'reports when Docker cannot be found' {
+        $specificationPath = Join-Path $TestDrive 'MissingDocker.psd1'
+        $outputPath = Join-Path $TestDrive 'missing-docker-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'MissingDockerExample'; Commands = @(@{ Name = 'Invoke-MissingDockerExample' }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'MissingDockerExample.psd1') -Force -PassThru
+        $originalPath = $env:PATH
+        try {
+            $env:PATH = ''
+            { Invoke-MissingDockerExample } |
+                Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage '*Docker is required*not found on PATH*'
+        }
+        finally {
+            $env:PATH = $originalPath
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'reports an unsuccessful Docker invocation' {
+        $specificationPath = Join-Path $TestDrive 'FailedDocker.psd1'
+        $outputPath = Join-Path $TestDrive 'failed-docker-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'FailedDockerExample'; Commands = @(@{ Name = 'Invoke-FailedDockerExample' }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'FailedDockerExample.psd1') -Force -PassThru
+        function global:docker { $global:LASTEXITCODE = 23 }
+        try {
+            { Invoke-FailedDockerExample -ErrorAction SilentlyContinue } |
+                Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage '*Docker failed with exit code 23*'
+        }
+        finally {
+            Remove-Item -Path Function:\docker -Force
             Remove-Module $module -Force
         }
     }

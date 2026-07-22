@@ -507,7 +507,7 @@ Supported mappings include:
 
 Generated commands place environment mappings before the image reference and argument mappings after it. Parameters omitted by the caller do not produce runtime arguments.
 
-`Mount` mappings require a non-empty string container `Target` and a non-empty string `Access` mode.
+`Mount` mappings require a non-empty string container `Target`. `Access` must be `ReadOnly` or `ReadWrite`. Generated commands resolve the supplied host path to an absolute path and emit a Docker bind mount before the image reference.
 
 A parameter may define multiple mappings.
 

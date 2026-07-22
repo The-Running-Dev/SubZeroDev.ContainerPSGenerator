@@ -21,9 +21,14 @@ function ConvertTo-ContainerModuleCommandSource {
             $parameter = $Command.Parameters[$index]
             $mandatory = if ($parameter.Mandatory) { 'Mandatory = $true' } else { '' }
             $separator = if ($index -lt ($Command.Parameters.Count - 1)) { ',' } else { '' }
+            $parameterType = switch -Regex ($parameter.Type) {
+                '^DirectoryInfo(\[\])?$' { $parameter.Type -replace '^DirectoryInfo', 'System.IO.DirectoryInfo'; break }
+                '^FileInfo(\[\])?$' { $parameter.Type -replace '^FileInfo', 'System.IO.FileInfo'; break }
+                default { $parameter.Type }
+            }
 
             $lines.Add("        [Parameter($mandatory)]")
-            $lines.Add("        [$($parameter.Type)] `$$($parameter.Name)$separator")
+            $lines.Add("        [$parameterType] `$$($parameter.Name)$separator")
         }
         $lines.Add('    )')
     }
@@ -32,6 +37,17 @@ function ConvertTo-ContainerModuleCommandSource {
     $lines.Add('    $dockerArguments = [System.Collections.Generic.List[string]]::new()')
     $lines.Add("    `$dockerArguments.Add('run')")
     $lines.Add("    `$dockerArguments.Add('--rm')")
+
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Mount') {
+            $target = $mapping.Definition['Target'].Replace("'", "''")
+            $readOnly = if ($mapping.Definition['Access'] -eq 'ReadOnly') { ',readonly' } else { '' }
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        `$dockerArguments.Add('--mount')")
+            $lines.Add("        `$dockerArguments.Add('type=bind,source=' + [System.IO.Path]::GetFullPath([string] `$$($parameter.Name)) + ',target=$target$readOnly')")
+            $lines.Add('    }')
+        }
+    }
 
     foreach ($parameter in $Command.Parameters) {
         foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Environment') {
@@ -63,7 +79,17 @@ function ConvertTo-ContainerModuleCommandSource {
     }
 
     $lines.Add('')
+    $lines.Add("    if (`$null -eq (Get-Command -Name 'docker' -ErrorAction SilentlyContinue)) {")
+    $lines.Add("        throw [System.InvalidOperationException]::new('Docker is required to run this command but was not found on PATH.')")
+    $lines.Add('    }')
+    $lines.Add('')
+    $lines.Add('    $global:LASTEXITCODE = 0')
     $lines.Add('    & docker @dockerArguments')
+    $lines.Add('    $dockerSucceeded = $?')
+    $lines.Add('    $dockerExitCode = $global:LASTEXITCODE')
+    $lines.Add('    if (-not $dockerSucceeded -or $dockerExitCode -ne 0) {')
+    $lines.Add('        throw [System.InvalidOperationException]::new("Docker failed with exit code $dockerExitCode.")')
+    $lines.Add('    }')
     $lines.Add('}')
 
     return ($lines -join "`n") + "`n"
