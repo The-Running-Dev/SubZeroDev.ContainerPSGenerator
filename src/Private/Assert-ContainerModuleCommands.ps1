@@ -35,6 +35,12 @@ function Assert-ContainerModuleCommands {
             )
         }
 
+        if ($name -notmatch '^[A-Za-z][A-Za-z0-9]*-[A-Za-z][A-Za-z0-9]*$') {
+            throw [System.IO.InvalidDataException]::new(
+                "Command name '$name' must use PowerShell Verb-Noun syntax with letters and numbers only."
+            )
+        }
+
         if (-not $commandNames.Add($name)) {
             throw [System.IO.InvalidDataException]::new(
                 "Command name '$name' is defined more than once. Command names are case-insensitive."
