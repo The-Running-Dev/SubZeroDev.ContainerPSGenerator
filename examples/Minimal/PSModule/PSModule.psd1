@@ -6,7 +6,16 @@
     Commands = @(
         @{
             Name        = 'Invoke-Example'
+            Synopsis    = 'Runs the example container.'
             Description = 'Runs the example container command.'
+            Notes       = 'Docker must be available on PATH unless using -WhatIf.'
+
+            Examples = @(
+                @{
+                    Code = "Invoke-Example -Repository . -Message 'hello'"
+                    Description = 'Runs the example container for the current repository.'
+                }
+            )
 
             Parameters = @(
                 @{

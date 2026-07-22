@@ -1196,6 +1196,42 @@ Describe 'Docker mount and error generation' {
 }
 
 Describe 'Generated command help and preview' {
+    It 'renders synopsis, description, notes, and structured examples' {
+        $specificationPath = Join-Path $TestDrive 'RichHelp.psd1'
+        $outputPath = Join-Path $TestDrive 'rich-help-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'RichHelpExample'
+    Commands = @(@{
+        Name = 'Invoke-RichHelpExample'
+        Synopsis = 'Runs the documented example.'
+        Description = 'Provides a longer explanation of the operation.'
+        Notes = 'Docker must be available on PATH.'
+        Examples = @(@{
+            Code = "Invoke-RichHelpExample -WhatIf"
+            Description = 'Previews the container invocation.'
+        })
+    })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'RichHelpExample.psd1') -Force -PassThru
+        try {
+            $help = Get-Help Invoke-RichHelpExample -Full
+
+            $help.Synopsis | Should -Be 'Runs the documented example.'
+            $help.Description.Text | Should -Be 'Provides a longer explanation of the operation.'
+            $help.alertSet.alert.Text | Should -Be 'Docker must be available on PATH.'
+            $help.Examples.Example[0].Code | Should -Be 'Invoke-RichHelpExample -WhatIf'
+            @($help.Examples.Example[0].Remarks.Text).Where({ -not [string]::IsNullOrWhiteSpace($_) }) |
+                Should -Be 'Previews the container invocation.'
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
+
     It 'renders command and parameter descriptions as help' {
         $specificationPath = Join-Path $TestDrive 'Help.psd1'
         $outputPath = Join-Path $TestDrive 'help-output'
@@ -1277,6 +1313,22 @@ Describe 'Generated command help and preview' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for command*"
         { Test-ContainerModuleSpecification -Specification $parameterSpecificationPath } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for parameter*"
+    }
+
+    It 'validates structured command help fields and examples' {
+        $invalidSynopsisPath = Join-Path $TestDrive 'InvalidSynopsis.psd1'
+        $scalarExamplesPath = Join-Path $TestDrive 'ScalarExamples.psd1'
+        $invalidExamplePath = Join-Path $TestDrive 'InvalidExample.psd1'
+        Set-Content -LiteralPath $invalidSynopsisPath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Synopsis = ' ' }) }"
+        Set-Content -LiteralPath $scalarExamplesPath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Examples = @{ Code = 'Invoke-Example'; Description = 'Runs it.' } }) }"
+        Set-Content -LiteralPath $invalidExamplePath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Examples = @(@{ Code = ' '; Description = 'Runs it.' }) }) }"
+
+        { Test-ContainerModuleSpecification -Specification $invalidSynopsisPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Synopsis' property for command*"
+        { Test-ContainerModuleSpecification -Specification $scalarExamplesPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Examples' property for command*must be an array*"
+        { Test-ContainerModuleSpecification -Specification $invalidExamplePath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Code' property for example*must be a non-empty string*"
     }
 }
 

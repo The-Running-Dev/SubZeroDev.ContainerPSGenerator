@@ -15,7 +15,17 @@ function ConvertTo-ContainerModuleMetadata {
                 [ordered] @{
                     Id          = $command.Id
                     Name        = $command.Name
+                    Synopsis    = $command.Synopsis
                     Description = $command.Description
+                    Notes       = $command.Notes
+                    Examples    = @(
+                        foreach ($example in $command.Examples) {
+                            [ordered] @{
+                                Code        = $example.Code
+                                Description = $example.Description
+                            }
+                        }
+                    )
                     Parameters  = @(
                         foreach ($parameter in $command.Parameters) {
                             [ordered] @{
