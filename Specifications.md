@@ -322,6 +322,8 @@ The specification favors explicit objects over nested hashtables.
 
 Commands are defined as arrays of objects.
 
+The `Commands` property is optional. When present, it must be an array. Each command must define a non-empty string `Name`, and command names must be unique without regard to case.
+
 ```powershell
 Commands = @(
     @{

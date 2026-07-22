@@ -107,3 +107,55 @@ Describe 'Container module build context' {
         }
     }
 }
+
+Describe 'Build-ContainerModule command validation' {
+    BeforeEach {
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'allows a specification with no commands' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{}'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.NotImplementedException])
+    }
+
+    It 'requires Commands to be an array' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @{ Name = ''Invoke-Example'' } }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Commands' property must be an array*"
+    }
+
+    It 'requires each command to be an object' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(''Invoke-Example'') }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*Command at index 0 must be an object*'
+    }
+
+    It 'requires each command to have a non-empty string name' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(@{ Name = '' '' }) }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Name'*"
+    }
+
+    It 'rejects case-insensitive duplicate command names' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example' }
+        @{ Name = 'invoke-example' }
+    )
+}
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*defined more than once*'
+    }
+}
