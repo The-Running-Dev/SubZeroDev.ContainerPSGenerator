@@ -25,5 +25,8 @@ function Build-ContainerModule {
     $context = New-ContainerModuleBuildContext -SpecificationPath $Specification -OutputPath $Output
     Assert-ContainerModuleSpecification -Specification $context.Specification
     $context.Model = ConvertTo-ContainerModuleModel -Specification $context.Specification
-    Write-ContainerModuleMetadata -Context $context
+    $metadataArtifact = Write-ContainerModuleMetadata -Context $context
+    Write-ContainerModuleCommandSource -Context $context
+
+    return $metadataArtifact
 }

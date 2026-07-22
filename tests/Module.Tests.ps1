@@ -192,6 +192,13 @@ Describe 'Build-ContainerModule command validation' {
         { Build-ContainerModule -Specification './Specification.psd1' } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*defined more than once*'
     }
+
+    It 'requires PowerShell Verb-Noun command syntax' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(@{ Name = ''../../Example'' }) }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*must use PowerShell Verb-Noun syntax*'
+    }
 }
 
 Describe 'Build-ContainerModule parameter validation' {
@@ -289,6 +296,24 @@ Describe 'Build-ContainerModule parameter validation' {
 
         { Build-ContainerModule -Specification './Specification.psd1' } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*defined more than once*'
+    }
+
+    It 'requires a valid PowerShell parameter identifier' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'bad-name'; Type = 'string' }) }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a valid PowerShell identifier*'
+    }
+
+    It 'requires a supported PowerShell type name' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string]; Write-Host bad; [string' }) }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a supported PowerShell type name*'
     }
 }
 
@@ -576,6 +601,44 @@ Describe 'Container module metadata generation' {
 
         $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
         [System.IO.File]::ReadAllText($artifact.FullName) | Should -BeExactly $firstContent
+    }
+}
+
+Describe 'Container module command source generation' {
+    It 'writes parseable deterministic command source with declared parameters' {
+        $specificationPath = Join-Path $TestDrive 'CommandSource.psd1'
+        $outputPath = Join-Path $TestDrive 'command-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Repository'; Type = 'DirectoryInfo'; Mandatory = $true }
+            @{ Name = 'Tags'; Type = 'string[]' }
+        ) }
+    )
+}
+'@
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        $sourcePath = Join-Path $outputPath 'Public' 'Invoke-Example.ps1'
+        $firstContent = [System.IO.File]::ReadAllText($sourcePath)
+        $tokens = $null
+        $parseErrors = $null
+        $null = [System.Management.Automation.Language.Parser]::ParseFile(
+            $sourcePath,
+            [ref] $tokens,
+            [ref] $parseErrors
+        )
+
+        $parseErrors | Should -BeNullOrEmpty
+        $firstContent | Should -Match 'function Invoke-Example'
+        $firstContent | Should -Match '\[Parameter\(Mandatory = \$true\)\]'
+        $firstContent | Should -Match '\[DirectoryInfo\] \$Repository,'
+        $firstContent | Should -Match '\[string\[\]\] \$Tags'
+        $firstContent | Should -Not -Match "`r`n"
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        [System.IO.File]::ReadAllText($sourcePath) | Should -BeExactly $firstContent
     }
 }
 

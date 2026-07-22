@@ -98,7 +98,15 @@ Build-ContainerModule `
     -Output ./artifacts/PSModule
 ```
 
-The first generated artifact is `./artifacts/PSModule/Metadata/model.json`. PowerShell module source and manifests will be added in later slices.
+Generated artifacts currently include:
+
+```text
+artifacts/PSModule/
+├── Metadata/model.json
+└── Public/<CommandName>.ps1
+```
+
+Public command files contain the declared parameter blocks and stop at the not-yet-implemented runtime invocation boundary. Module manifests and Docker invocation will be added in later slices.
 
 ### Test another local repository
 

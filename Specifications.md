@@ -324,6 +324,8 @@ Commands are defined as arrays of objects.
 
 The `Commands` property is optional. When present, it must be an array. Each command must define a non-empty string `Name`, and command names must be unique without regard to case.
 
+Command names use PowerShell `Verb-Noun` syntax. Version 1 command names contain letters and numbers with a single separator hyphen.
+
 ```powershell
 Commands = @(
     @{
@@ -342,6 +344,8 @@ Commands = @(
 Parameters are arrays of typed objects.
 
 The `Parameters` property is optional on a command. When present, it must be an array. Each parameter must define a non-empty string `Name` and `Type`. Parameter names must be unique within their command without regard to case. When specified, `Mandatory` must be Boolean.
+
+Parameter names must be valid PowerShell identifiers. Version 1 type names support simple or namespace-qualified names and optional array suffixes, such as `string`, `System.Uri`, and `string[]`.
 
 ```powershell
 Parameters = @(
