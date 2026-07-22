@@ -84,6 +84,9 @@
                     Name = 'Network'
                     Description = 'Optional Docker network name.'
                     Type = 'string'
+                    Completions = @(
+                        @{ Type = 'Static'; Values = @('bridge', 'host', 'none') }
+                    )
                     Mappings = @(
                         @{ Type = 'RuntimeOption'; Name = '--network' }
                     )

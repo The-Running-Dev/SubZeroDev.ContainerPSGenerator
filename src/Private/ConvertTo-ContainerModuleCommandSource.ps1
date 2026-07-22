@@ -75,6 +75,14 @@ function ConvertTo-ContainerModuleCommandSource {
             }
 
             $lines.Add("        [Parameter($mandatory)]")
+            $completionValues = @(
+                foreach ($completion in $parameter.Completions | Where-Object Type -eq 'Static') {
+                    foreach ($value in $completion.Values) { "'$($value.Replace("'", "''"))'" }
+                }
+            )
+            if ($completionValues.Count -gt 0) {
+                $lines.Add("        [ArgumentCompletions($($completionValues -join ', '))]")
+            }
             foreach ($validation in $parameter.Validations) {
                 switch ($validation.Type) {
                     'ValidateSet' {

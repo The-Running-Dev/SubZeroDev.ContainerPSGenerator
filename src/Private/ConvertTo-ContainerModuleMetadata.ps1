@@ -35,6 +35,14 @@ function ConvertTo-ContainerModuleMetadata {
                                 Description = $parameter.Description
                                 Type      = $parameter.Type
                                 Mandatory = $parameter.Mandatory
+                                Completions = @(
+                                    foreach ($completion in $parameter.Completions) {
+                                        [ordered] @{
+                                            Type   = $completion.Type
+                                            Values = @($completion.Values)
+                                        }
+                                    }
+                                )
                                 Validations = @(
                                     foreach ($validation in $parameter.Validations) {
                                         $metadata = [ordered] @{ Type = $validation.Type }
