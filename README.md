@@ -90,7 +90,7 @@ Test-ContainerModuleSpecification `
 
 A valid specification returns `True`. Invalid files produce a focused error identifying the first rule that failed. Copy the example PSD1 to experiment with command and parameter definitions.
 
-`Build-ContainerModule` currently loads and validates the specification, builds the normalized model, and writes its deterministic metadata snapshot:
+`Build-ContainerModule` loads and validates the specification, builds the normalized model, clears the selected output directory, and writes a deterministic module package:
 
 ```powershell
 Build-ContainerModule `
@@ -102,12 +102,19 @@ Generated artifacts currently include:
 
 ```text
 artifacts/PSModule/
+├── <ModuleName>.psd1
 ├── <ModuleName>.psm1
 ├── Metadata/model.json
 └── Public/<CommandName>.ps1
 ```
 
-The generated loader imports and exports every public command. Public command files contain the declared parameter blocks and stop at the not-yet-implemented runtime invocation boundary. Module manifests and Docker invocation will be added in later slices.
+Import the generated module through its manifest:
+
+```powershell
+Import-Module ./artifacts/PSModule/ExampleContainer.psd1 -Force
+```
+
+The generated manifest declares the module version and exported functions, while the loader imports every public command. Public command files contain the declared parameter blocks and stop at the not-yet-implemented runtime invocation boundary. Docker invocation will be added in later slices.
 
 ### Test another local repository
 

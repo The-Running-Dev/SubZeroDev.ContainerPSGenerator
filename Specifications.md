@@ -111,6 +111,8 @@ Build-ContainerModule -Output ./dist
 
 Each build overwrites previously generated output.
 
+The generator validates the specification before clearing the selected output directory. It then writes a module manifest whose root module, version, and exported functions match the normalized model.
+
 ---
 
 # Build Model
