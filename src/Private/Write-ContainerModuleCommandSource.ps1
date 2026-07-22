@@ -14,7 +14,7 @@ function Write-ContainerModuleCommandSource {
 
     foreach ($command in $Context.Model.Commands) {
         $sourcePath = Join-Path $publicDirectory "$($command.Name).ps1"
-        $source = ConvertTo-ContainerModuleCommandSource -Command $command
+        $source = ConvertTo-ContainerModuleCommandSource -Command $command -ContainerImage $Context.Model.ContainerImage
         [System.IO.File]::WriteAllText(
             $sourcePath,
             $source,

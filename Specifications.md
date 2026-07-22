@@ -323,9 +323,10 @@ Optional module identity properties are:
 ```powershell
 ModuleName = "BuildAgent"
 ModuleVersion = "0.1.0"
+ContainerImage = "ghcr.io/example/build-agent:latest"
 ```
 
-`ModuleName` must be safe for use as a file name and begin with a letter. `ModuleVersion` must be a valid PowerShell version string. When omitted, they default to `PSModule` and `0.1.0`.
+`ModuleName` must be safe for use as a file name and begin with a letter. `ModuleVersion` must be a valid PowerShell version string. `ContainerImage` must be a container image reference without whitespace. When omitted, the values default to `PSModule`, `0.1.0`, and the resolved module name respectively.
 
 ---
 
@@ -503,6 +504,8 @@ Supported mappings include:
 - Runtime options
 
 `Argument` and `Environment` mappings require a non-empty string `Name`.
+
+Generated commands place environment mappings before the image reference and argument mappings after it. Parameters omitted by the caller do not produce runtime arguments.
 
 `Mount` mappings require a non-empty string container `Target` and a non-empty string `Access` mode.
 

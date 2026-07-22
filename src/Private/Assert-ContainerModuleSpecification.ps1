@@ -6,6 +6,7 @@ param (
     )
 
     Assert-ContainerModuleIdentity -Specification $Specification
+    Assert-ContainerModuleRuntime -Specification $Specification
     Assert-ContainerModuleCommands -Specification $Specification
     Assert-ContainerModuleParameters -Specification $Specification
     Assert-ContainerModuleMappings -Specification $Specification
