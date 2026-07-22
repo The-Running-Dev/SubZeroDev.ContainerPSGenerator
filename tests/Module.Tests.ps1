@@ -691,6 +691,77 @@ Describe 'Container module loader generation' {
     }
 }
 
+Describe 'Container module manifest generation' {
+    It 'writes a valid manifest that imports and exports generated commands' {
+        $specificationPath = Join-Path $TestDrive 'Manifest.psd1'
+        $outputPath = Join-Path $TestDrive 'manifest-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'ManifestExample'
+    ModuleVersion = '2.3.4'
+    Commands = @(
+        @{ Name = 'Invoke-ManifestExample'; Parameters = @() }
+    )
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+
+        $generatedManifestPath = Join-Path $outputPath 'ManifestExample.psd1'
+        $manifest = Test-ModuleManifest -Path $generatedManifestPath -ErrorAction Stop
+        $module = Import-Module $generatedManifestPath -Force -PassThru
+        try {
+            $manifest.Version.ToString() | Should -Be '2.3.4'
+            $module.ExportedFunctions.Keys | Should -Contain 'Invoke-ManifestExample'
+        }
+        finally {
+            Remove-Module ManifestExample -Force
+        }
+    }
+
+    It 'writes deterministic manifest content' {
+        $specificationPath = Join-Path $TestDrive 'DeterministicManifest.psd1'
+        $outputPath = Join-Path $TestDrive 'deterministic-manifest-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'StableExample'; Commands = @(@{ Name = 'Get-StableExample' }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $first = [System.IO.File]::ReadAllBytes((Join-Path $outputPath 'StableExample.psd1'))
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $second = [System.IO.File]::ReadAllBytes((Join-Path $outputPath 'StableExample.psd1'))
+
+        [Convert]::ToHexString($second) | Should -Be ([Convert]::ToHexString($first))
+    }
+}
+
+Describe 'Container module output reset' {
+    It 'removes stale artifacts before generating the current module' {
+        $specificationPath = Join-Path $TestDrive 'Reset.psd1'
+        $outputPath = Join-Path $TestDrive 'reset-output'
+        New-Item -Path $outputPath -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $outputPath 'stale.txt') -Value 'old build'
+        Set-Content -LiteralPath $specificationPath -Value '@{ Commands = @() }'
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+
+        Test-Path -LiteralPath (Join-Path $outputPath 'stale.txt') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $outputPath 'PSModule.psd1') | Should -BeTrue
+    }
+
+    It 'preserves existing output when validation fails' {
+        $specificationPath = Join-Path $TestDrive 'InvalidReset.psd1'
+        $outputPath = Join-Path $TestDrive 'preserved-output'
+        New-Item -Path $outputPath -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $outputPath 'keep.txt') -Value 'keep me'
+        Set-Content -LiteralPath $specificationPath -Value "@{ ModuleVersion = 'invalid' }"
+
+        { Build-ContainerModule -Specification $specificationPath -Output $outputPath } | Should -Throw
+
+        Test-Path -LiteralPath (Join-Path $outputPath 'keep.txt') | Should -BeTrue
+    }
+}
+
 Describe 'Test-LocalRepository script' {
     BeforeAll {
         $repositoryPath = Join-Path $TestDrive 'Repository'
