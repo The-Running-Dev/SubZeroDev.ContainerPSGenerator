@@ -135,6 +135,47 @@ function ConvertTo-ContainerModuleCommandSource {
     }
 
     foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'ResourceLimit') {
+            $resource = $mapping.Definition['Resource']
+            $option = if ($resource -eq 'Memory') { '--memory' } else { '--cpus' }
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            if ($resource -eq 'Memory') {
+                $lines.Add("        if (`$$($parameter.Name) -notmatch '^[1-9][0-9]*(?:[bBkKmMgG])?`$') {")
+                $lines.Add("            throw [System.ArgumentException]::new('Memory limit must be a positive integer with an optional b, k, m, or g suffix.', '$($parameter.Name)')")
+                $lines.Add('        }')
+                $lines.Add("        `$resourceValue = `$$($parameter.Name)")
+            }
+            else {
+                $lines.Add("        if (`$$($parameter.Name) -le 0) {")
+                $lines.Add("            throw [System.ArgumentOutOfRangeException]::new('$($parameter.Name)', 'CPU limit must be greater than zero.')")
+                $lines.Add('        }')
+                $lines.Add("        `$resourceValue = [System.Convert]::ToString(`$$($parameter.Name), [System.Globalization.CultureInfo]::InvariantCulture)")
+            }
+            $lines.Add("        `$dockerArguments.Add('$option')")
+            $lines.Add("        `$dockerArguments.Add(`$resourceValue)")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Secret') {
+            $target = if ($mapping.Definition.Contains('Target')) { $mapping.Definition['Target'] } else { '/run/secrets/' + $mapping.Definition['Name'] }
+            $target = $target.Replace("'", "''")
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        `$secretPath = [System.IO.Path]::GetFullPath([string] `$$($parameter.Name))")
+            $lines.Add("        if (`$secretPath.Contains(',')) {")
+            $lines.Add("            throw [System.ArgumentException]::new('Secret file path cannot contain a comma.', '$($parameter.Name)')")
+            $lines.Add('        }')
+            $lines.Add("        if (-not [System.IO.File]::Exists(`$secretPath)) {")
+            $lines.Add("            throw [System.IO.FileNotFoundException]::new('Secret file was not found.', `$secretPath)")
+            $lines.Add('        }')
+            $lines.Add("        `$dockerArguments.Add('--mount')")
+            $lines.Add("        `$dockerArguments.Add('type=bind,source=' + `$secretPath + ',target=$target,readonly')")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
         foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Mount') {
             $target = $mapping.Definition['Target'].Replace("'", "''")
             $readOnly = if ($mapping.Definition['Access'] -eq 'ReadOnly') { ',readonly' } else { '' }

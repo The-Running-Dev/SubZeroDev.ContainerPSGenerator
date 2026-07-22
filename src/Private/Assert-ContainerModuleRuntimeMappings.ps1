@@ -41,6 +41,45 @@ function Assert-ContainerModuleRuntimeMappings {
                             )
                         }
                     }
+                    'ResourceLimit' {
+                        $resource = $mapping['Resource']
+                        if ($resource -notin @('Memory', 'Cpus')) {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Resource' property for ResourceLimit mapping on parameter '$($parameter['Name'])' must be 'Memory' or 'Cpus'."
+                            )
+                        }
+                        if ($resource -eq 'Memory' -and $parameter['Type'] -ne 'string') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Memory ResourceLimit mapping parameter '$($parameter['Name'])' must use type 'string'."
+                            )
+                        }
+                        if ($resource -eq 'Cpus' -and $parameter['Type'] -notin @('int', 'long', 'double', 'decimal')) {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Cpus ResourceLimit mapping parameter '$($parameter['Name'])' must use a numeric type."
+                            )
+                        }
+                    }
+                    'Secret' {
+                        if ($parameter['Type'] -notin @('string', 'FileInfo', 'System.IO.FileInfo')) {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Secret mapping parameter '$($parameter['Name'])' on command '$($command['Name'])' must use type 'string' or 'FileInfo'."
+                            )
+                        }
+                        $name = $mapping['Name']
+                        if ($name -isnot [string] -or $name -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]*$') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Name' property for Secret mapping on parameter '$($parameter['Name'])' must be a safe non-empty file name."
+                            )
+                        }
+                        if ($mapping.Contains('Target')) {
+                            $target = $mapping['Target']
+                            if ($target -isnot [string] -or $target -notmatch '^/[^,]+$') {
+                                throw [System.IO.InvalidDataException]::new(
+                                    "The 'Target' property for Secret mapping on parameter '$($parameter['Name'])' must be an absolute container path without commas."
+                                )
+                            }
+                        }
+                    }
                     'WorkingDirectory' {
                         $workingDirectoryCount++
                         if ($parameter['Type'] -ne 'string') {

@@ -550,6 +550,10 @@ Generated commands place environment mappings before the image reference and arg
 
 `Gpu` mappings use a string parameter and emit Docker `--gpus`. Runtime values accept `all`, a positive GPU count, or a device selector such as `device=0,1`.
 
+`ResourceLimit` mappings define a `Resource` of `Memory` or `Cpus`. Memory uses a string value such as `512m`; CPUs use a positive numeric value. Generated commands emit `--memory` or `--cpus` using culture-invariant values.
+
+`Secret` mappings use a `string` or `FileInfo` parameter for a host secret file and require a safe `Name`. Because standalone `docker run` does not provide the Swarm secret flag, generated commands mount the file read-only at `/run/secrets/<Name>` or an optional absolute container `Target`.
+
 A parameter may define multiple mappings.
 
 ---
