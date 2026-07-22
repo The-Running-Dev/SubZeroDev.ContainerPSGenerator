@@ -65,6 +65,15 @@ function Assert-ContainerModuleParameters {
                 )
             }
 
+            if ($parameter.Contains('Description')) {
+                $description = $parameter['Description']
+                if ($description -isnot [string] -or [string]::IsNullOrWhiteSpace($description)) {
+                    throw [System.IO.InvalidDataException]::new(
+                        "The 'Description' property for parameter '$name' on command '$($command['Name'])' must be a non-empty string."
+                    )
+                }
+            }
+
             if (-not $parameterNames.Add($name)) {
                 throw [System.IO.InvalidDataException]::new(
                     "Parameter name '$name' is defined more than once on command '$($command['Name'])'. Parameter names are case-insensitive."

@@ -10,7 +10,26 @@ function ConvertTo-ContainerModuleCommandSource {
 
     $lines = [System.Collections.Generic.List[string]]::new()
     $lines.Add("function $($Command.Name) {")
-    $lines.Add('    [CmdletBinding()]')
+    $lines.Add('    <#')
+    $lines.Add('    .SYNOPSIS')
+    $commandDescription = if ([string]::IsNullOrWhiteSpace($Command.Description)) {
+        "Runs the $($Command.Name) container command."
+    }
+    else {
+        $Command.Description
+    }
+    foreach ($descriptionLine in $commandDescription.Replace('#>', '# >') -split "`r?`n") {
+        $lines.Add("    $descriptionLine")
+    }
+    foreach ($parameter in $Command.Parameters | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Description) }) {
+        $lines.Add('')
+        $lines.Add("    .PARAMETER $($parameter.Name)")
+        foreach ($descriptionLine in $parameter.Description.Replace('#>', '# >') -split "`r?`n") {
+            $lines.Add("    $descriptionLine")
+        }
+    }
+    $lines.Add('    #>')
+    $lines.Add("    [CmdletBinding(SupportsShouldProcess = `$true, ConfirmImpact = 'Low')]")
 
     if ($Command.Parameters.Count -eq 0) {
         $lines.Add('    param ()')
@@ -78,6 +97,10 @@ function ConvertTo-ContainerModuleCommandSource {
         }
     }
 
+    $lines.Add('')
+    $lines.Add("    if (-not `$PSCmdlet.ShouldProcess('$($ContainerImage.Replace("'", "''"))', 'docker ' + (`$dockerArguments -join ' '))) {")
+    $lines.Add('        return')
+    $lines.Add('    }')
     $lines.Add('')
     $lines.Add("    if (`$null -eq (Get-Command -Name 'docker' -ErrorAction SilentlyContinue)) {")
     $lines.Add("        throw [System.InvalidOperationException]::new('Docker is required to run this command but was not found on PATH.')")

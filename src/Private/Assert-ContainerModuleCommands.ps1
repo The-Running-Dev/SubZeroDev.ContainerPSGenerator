@@ -41,6 +41,15 @@ function Assert-ContainerModuleCommands {
             )
         }
 
+        if ($command.Contains('Description')) {
+            $description = $command['Description']
+            if ($description -isnot [string] -or [string]::IsNullOrWhiteSpace($description)) {
+                throw [System.IO.InvalidDataException]::new(
+                    "The 'Description' property for command '$name' must be a non-empty string."
+                )
+            }
+        }
+
         if (-not $commandNames.Add($name)) {
             throw [System.IO.InvalidDataException]::new(
                 "Command name '$name' is defined more than once. Command names are case-insensitive."

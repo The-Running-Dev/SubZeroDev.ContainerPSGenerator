@@ -445,6 +445,8 @@ The specification contains:
 - Notes
 - Basic examples
 
+Command and parameter `Description` values are rendered as comment-based help. Generated commands support PowerShell's common `-WhatIf` parameter and display the planned Docker invocation without executing it.
+
 Long-form documentation may be supplied through Markdown.
 
 ---

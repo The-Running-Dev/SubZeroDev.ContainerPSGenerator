@@ -967,6 +967,91 @@ Describe 'Docker mount and error generation' {
     }
 }
 
+Describe 'Generated command help and preview' {
+    It 'renders command and parameter descriptions as help' {
+        $specificationPath = Join-Path $TestDrive 'Help.psd1'
+        $outputPath = Join-Path $TestDrive 'help-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'HelpExample'
+    Commands = @(@{
+        Name = 'Invoke-HelpExample'
+        Description = 'Runs a documented container operation.'
+        Parameters = @(@{
+            Name = 'Message'
+            Description = 'Message supplied to the container.'
+            Type = 'string'
+        })
+    })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'HelpExample.psd1') -Force -PassThru
+        try {
+            $help = Get-Help Invoke-HelpExample -Full
+
+            $help.Synopsis | Should -Be 'Runs a documented container operation.'
+            $help.Parameters.Parameter.Where({ $_.Name -eq 'Message' }).Description.Text |
+                Should -Be 'Message supplied to the container.'
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'previews the Docker invocation without discovering or running Docker' {
+        $specificationPath = Join-Path $TestDrive 'Preview.psd1'
+        $outputPath = Join-Path $TestDrive 'preview-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'PreviewExample'
+    ContainerImage = 'example/preview-tool'
+    Commands = @(@{ Name = 'Invoke-PreviewExample'; Parameters = @(
+        @{ Name = 'Message'; Type = 'string'; Mappings = @(
+            @{ Type = 'Argument'; Name = '--message' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'PreviewExample.psd1') -Force -PassThru
+        $global:dockerWasInvoked = $false
+        function global:docker { $global:dockerWasInvoked = $true }
+        try {
+            $command = Get-Command Invoke-PreviewExample
+            Invoke-PreviewExample -Message 'hello' -WhatIf
+
+            $command.Parameters.Keys | Should -Contain 'WhatIf'
+            $global:dockerWasInvoked | Should -BeFalse
+        }
+        finally {
+            Remove-Item -Path Function:\docker -Force
+            Remove-Variable -Name dockerWasInvoked -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'requires descriptions to be non-empty strings when provided' {
+        $commandSpecificationPath = Join-Path $TestDrive 'InvalidCommandHelp.psd1'
+        $parameterSpecificationPath = Join-Path $TestDrive 'InvalidParameterHelp.psd1'
+        Set-Content -LiteralPath $commandSpecificationPath -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Description = ' ' }) }
+'@
+        Set-Content -LiteralPath $parameterSpecificationPath -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(
+    @{ Name = 'Message'; Type = 'string'; Description = 42 }
+) }) }
+'@
+
+        { Test-ContainerModuleSpecification -Specification $commandSpecificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for command*"
+        { Test-ContainerModuleSpecification -Specification $parameterSpecificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for parameter*"
+    }
+}
+
 Describe 'Test-LocalRepository script' {
     BeforeAll {
         $repositoryPath = Join-Path $TestDrive 'Repository'
