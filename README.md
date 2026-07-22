@@ -35,7 +35,7 @@ Docker is the initial container runtime. The mapping model is designed so that f
 
 ## Planned architecture
 
-The generator uses a plugin-oriented pipeline:
+The generator uses a plugin-oriented pipeline. Specifications reject unknown mapping and validation types, and may assign globally unique stable IDs to the root, commands, and parameters:
 
 ```text
 Repository

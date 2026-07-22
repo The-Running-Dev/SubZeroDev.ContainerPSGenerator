@@ -496,7 +496,7 @@ Future versions may reuse them for testing and documentation generation.
 
 Mappings are first-class typed objects.
 
-The `Mappings` property is optional on a parameter. When present, it must be an array. Each mapping must be an object with a non-empty string `Type`. Rules for the properties required by each mapping type are applied separately.
+The `Mappings` property is optional on a parameter. When present, it must be an array. Each mapping must be an object with a supported, non-empty string `Type`. Unknown mapping types are rejected so that a specification cannot silently omit runtime behavior. Rules for the properties required by each mapping type are applied separately.
 
 ```powershell
 Mappings = @(
@@ -568,6 +568,8 @@ Objects whose type is implied by their containing collection may omit `Type`.
 # Object Identity
 
 Major specification objects may define an optional `Id`.
+
+Version 1 supports `Id` on the specification root, commands, and parameters. Ids begin with a letter or number, may contain letters, numbers, dots, underscores, and hyphens, and must be unique without regard to case across the specification.
 
 Ids provide stable identifiers for:
 

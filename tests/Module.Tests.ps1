@@ -409,6 +409,68 @@ Describe 'Container module mapping validation' {
         { Test-ContainerModuleSpecification -Specification $specificationPath } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Type'*"
     }
+
+    It 'rejects unsupported mapping types' {
+        $specificationPath = Join-Path $TestDrive 'UnsupportedMapping.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(
+    @{ Name = 'Value'; Type = 'string'; Mappings = @(@{ Type = 'CustomRuntimeBehavior' }) }
+) }) }
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*Mapping type 'CustomRuntimeBehavior'*is not supported*"
+    }
+}
+
+Describe 'Container module object identities' {
+    It 'normalizes root, command, and parameter IDs into model metadata' {
+        $specificationPath = Join-Path $TestDrive 'Identities.psd1'
+        $outputPath = Join-Path $TestDrive 'identity-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Id = 'module.example'
+    Commands = @(@{
+        Id = 'command.example'
+        Name = 'Invoke-Example'
+        Parameters = @(@{ Id = 'parameter.value'; Name = 'Value'; Type = 'string' })
+    })
+}
+'@
+
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $metadata = Get-Content -LiteralPath (Join-Path $outputPath 'Metadata/model.json') -Raw | ConvertFrom-Json
+
+        $model.Id | Should -Be 'module.example'
+        $model.Commands[0].Id | Should -Be 'command.example'
+        $model.Commands[0].Parameters[0].Id | Should -Be 'parameter.value'
+        $metadata.Id | Should -Be 'module.example'
+    }
+
+    It 'requires IDs to use the supported identifier syntax' {
+        $specificationPath = Join-Path $TestDrive 'InvalidIdentity.psd1'
+        Set-Content -LiteralPath $specificationPath -Value "@{ Commands = @(@{ Id = 'command example'; Name = 'Invoke-Example' }) }"
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Id' property for command*"
+    }
+
+    It 'requires IDs to be globally unique without regard to case' {
+        $specificationPath = Join-Path $TestDrive 'DuplicateIdentity.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Id = 'shared.identity'
+    Commands = @(@{
+        Name = 'Invoke-Example'
+        Parameters = @(@{ Id = 'SHARED.IDENTITY'; Name = 'Value'; Type = 'string' })
+    })
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*Id 'SHARED.IDENTITY'*defined more than once*"
+    }
 }
 
 Describe 'Named mapping validation' {
