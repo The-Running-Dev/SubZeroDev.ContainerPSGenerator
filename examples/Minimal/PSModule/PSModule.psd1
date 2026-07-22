@@ -9,6 +9,13 @@
                     Name      = 'Message'
                     Type      = 'string'
                     Mandatory = $true
+
+                    Mappings = @(
+                        @{
+                            Type = 'Environment'
+                            Name = 'EXAMPLE_MESSAGE'
+                        }
+                    )
                 }
             )
         }

@@ -291,3 +291,78 @@ Describe 'Build-ContainerModule parameter validation' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*defined more than once*'
     }
 }
+
+Describe 'Container module mapping validation' {
+    It 'allows a valid mappings array' {
+        $specificationPath = Join-Path $TestDrive 'ValidMappings.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{
+            Name = 'Invoke-Example'
+            Parameters = @(
+                @{
+                    Name = 'Message'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'Environment'; Name = 'EXAMPLE_MESSAGE' }
+                        @{ Type = 'Argument'; Name = '--message' }
+                    )
+                }
+            )
+        }
+    )
+}
+'@
+
+        Test-ContainerModuleSpecification -Specification $specificationPath | Should -BeTrue
+    }
+
+    It 'requires Mappings to be an array' {
+        $specificationPath = Join-Path $TestDrive 'ScalarMappings.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @{ Type = 'Environment' } }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Mappings' property*must be an array*"
+    }
+
+    It 'requires each mapping to be an object' {
+        $specificationPath = Join-Path $TestDrive 'ScalarMapping.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @('Environment') }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*Mapping at index 0*must be an object*'
+    }
+
+    It 'requires each mapping to have a non-empty string type' {
+        $specificationPath = Join-Path $TestDrive 'MissingMappingType.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @(@{ Name = 'EXAMPLE_MESSAGE' }) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Type'*"
+    }
+}
