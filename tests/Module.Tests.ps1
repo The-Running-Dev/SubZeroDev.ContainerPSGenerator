@@ -1056,6 +1056,13 @@ Describe 'Generated command help and preview' {
 Describe 'Install-ContainerModule' {
     BeforeEach {
         $global:dockerCalls = [System.Collections.Generic.List[string]]::new()
+        function global:Write-TestContainerModule {
+            param ([string] $Path)
+            Set-Content -LiteralPath (Join-Path $Path 'Example.psm1') -Value ''
+            Set-Content -LiteralPath (Join-Path $Path 'Example.psd1') -Value @'
+@{ RootModule = 'Example.psm1'; ModuleVersion = '1.0.0' }
+'@
+        }
     }
 
     AfterEach {
@@ -1063,6 +1070,7 @@ Describe 'Install-ContainerModule' {
             Remove-Item Function:\docker -Force
         }
         Remove-Variable -Name dockerCalls -Scope Global -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Write-TestContainerModule -Force -ErrorAction SilentlyContinue
     }
 
     It 'copies the embedded module and removes the temporary container' {
@@ -1071,16 +1079,16 @@ Describe 'Install-ContainerModule' {
             $global:dockerCalls.Add(($args -join ' '))
             $global:LASTEXITCODE = 0
             if ($args[0] -eq 'create') { 'container-123' }
+            if ($args[0] -eq 'cp') { Write-TestContainerModule -Path $args[2] }
         }
 
         $installedDirectory = Install-ContainerModule 'example/tool:1.0' -Destination $destination
 
         $installedDirectory.FullName | Should -Be ([System.IO.Path]::GetFullPath($destination))
-        $global:dockerCalls | Should -Be @(
-            'create example/tool:1.0'
-            "cp container-123:/PSModule/. $([System.IO.Path]::GetFullPath($destination))"
-            'rm --force container-123'
-        )
+        $global:dockerCalls[0] | Should -Be 'create example/tool:1.0'
+        $global:dockerCalls[1] | Should -Match '^cp container-123:/PSModule/\. .+\.installed-module\.install-[a-f0-9]{32}$'
+        $global:dockerCalls[2] | Should -Be 'rm --force container-123'
+        Test-Path -LiteralPath (Join-Path $destination 'Example.psd1') | Should -BeTrue
     }
 
     It 'removes the temporary container when copying fails' {
@@ -1116,6 +1124,63 @@ Describe 'Install-ContainerModule' {
 
         $global:dockerCalls | Should -BeNullOrEmpty
         Test-Path -LiteralPath $destination | Should -BeFalse
+    }
+
+    It 'requires Force before replacing an existing destination' {
+        $destination = Join-Path $TestDrive 'existing-install'
+        New-Item -Path $destination -ItemType Directory | Out-Null
+        Set-Content -LiteralPath (Join-Path $destination 'existing.txt') -Value 'preserve'
+        function global:docker { throw 'Docker should not be called.' }
+
+        { Install-ContainerModule 'example/tool:1.0' -Destination $destination } |
+            Should -Throw -ExceptionType ([System.IO.IOException]) -ExpectedMessage '*already exists*Use -Force*'
+
+        Test-Path -LiteralPath (Join-Path $destination 'existing.txt') | Should -BeTrue
+        $global:dockerCalls | Should -BeNullOrEmpty
+    }
+
+    It 'rejects a filesystem root as the destination' {
+        $rootPath = [System.IO.Path]::GetPathRoot($TestDrive)
+        function global:docker { throw 'Docker should not be called.' }
+
+        { Install-ContainerModule 'example/tool:1.0' -Destination $rootPath -Force } |
+            Should -Throw -ExceptionType ([System.ArgumentException]) -ExpectedMessage '*destination cannot be a filesystem root*'
+    }
+
+    It 'preserves an existing destination when staged manifest validation fails' {
+        $destination = Join-Path $TestDrive 'preserved-install'
+        New-Item -Path $destination -ItemType Directory | Out-Null
+        Set-Content -LiteralPath (Join-Path $destination 'existing.txt') -Value 'preserve'
+        function global:docker {
+            $global:dockerCalls.Add(($args -join ' '))
+            $global:LASTEXITCODE = 0
+            if ($args[0] -eq 'create') { 'container-invalid-module' }
+        }
+
+        { Install-ContainerModule 'example/tool:1.0' -Destination $destination -Force } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*exactly one module manifest*Found 0*'
+
+        Test-Path -LiteralPath (Join-Path $destination 'existing.txt') | Should -BeTrue
+        $global:dockerCalls[-1] | Should -Be 'rm --force container-invalid-module'
+        @(Get-ChildItem -LiteralPath $TestDrive -Directory -Filter '.preserved-install.install-*').Count | Should -Be 0
+    }
+
+    It 'replaces a validated existing destination with Force' {
+        $destination = Join-Path $TestDrive 'replaced-install'
+        New-Item -Path $destination -ItemType Directory | Out-Null
+        Set-Content -LiteralPath (Join-Path $destination 'old.txt') -Value 'old'
+        function global:docker {
+            $global:dockerCalls.Add(($args -join ' '))
+            $global:LASTEXITCODE = 0
+            if ($args[0] -eq 'create') { 'container-replacement' }
+            if ($args[0] -eq 'cp') { Write-TestContainerModule -Path $args[2] }
+        }
+
+        Install-ContainerModule 'example/tool:1.0' -Destination $destination -Force | Out-Null
+
+        Test-Path -LiteralPath (Join-Path $destination 'old.txt') | Should -BeFalse
+        Test-ModuleManifest -Path (Join-Path $destination 'Example.psd1') -ErrorAction Stop |
+            Should -Not -BeNullOrEmpty
     }
 
     It 'reports when Docker is unavailable' {

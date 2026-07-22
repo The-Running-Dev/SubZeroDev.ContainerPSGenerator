@@ -94,6 +94,12 @@ Install-ContainerModule ghcr.io/example/example-container:latest -WhatIf
 Install-ContainerModule ghcr.io/example/example-container:latest -Destination ~/Modules/ExampleContainer
 ```
 
+Extraction is staged and the embedded manifest is validated before installation. Existing destinations are preserved unless replacement is explicitly requested:
+
+```powershell
+Install-ContainerModule ghcr.io/example/example-container:latest -Destination ~/Modules/ExampleContainer -Force
+```
+
 Validate the included example specification:
 
 ```powershell
