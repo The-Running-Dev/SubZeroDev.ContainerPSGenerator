@@ -1635,6 +1635,58 @@ Describe 'Generated command help and preview' {
     }
 }
 
+Describe 'Generated Markdown command documentation' {
+    It 'writes deterministic command references from the normalized help model' {
+        $specificationPath = Join-Path $TestDrive 'MarkdownHelp.psd1'
+        $outputPath = Join-Path $TestDrive 'markdown-help-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'MarkdownHelpExample'
+    Commands = @(@{
+        Name = 'Invoke-MarkdownHelpExample'
+        Synopsis = 'Runs the **documented** operation.'
+        Description = 'A longer Markdown description.'
+        Notes = 'Requires Docker.'
+        Examples = @(@{
+            Code = "Invoke-MarkdownHelpExample -Message 'hello'"
+            Description = 'Runs with a message.'
+        })
+        Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mandatory = $true; Description = 'Message to send.' }
+            @{ Name = 'Count'; Type = 'int'; Description = 'Optional repeat count.' }
+        )
+    })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $documentationPath = Join-Path $outputPath 'Documentation' 'Invoke-MarkdownHelpExample.md'
+        $firstBytes = [System.IO.File]::ReadAllBytes($documentationPath)
+        $markdown = [System.Text.Encoding]::UTF8.GetString($firstBytes)
+
+        $markdown | Should -Match '^# Invoke-MarkdownHelpExample\n'
+        $markdown | Should -Match 'Runs the \*\*documented\*\* operation\.'
+        $markdown | Should -Match 'Invoke-MarkdownHelpExample -Message <string> \[-Count <int>\] \[<CommonParameters>\]'
+        $markdown | Should -Match '### `-Message`\n\nType: `string`  \nRequired: Yes'
+        $markdown | Should -Match "    Invoke-MarkdownHelpExample -Message 'hello'"
+        $markdown | Should -Match '## Notes\n\nRequires Docker\.'
+        $firstBytes[0..2] | Should -Not -Be @(0xEF, 0xBB, 0xBF)
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        [System.IO.File]::ReadAllBytes($documentationPath) | Should -Be $firstBytes
+    }
+
+    It 'does not create a documentation directory when no commands exist' {
+        $specificationPath = Join-Path $TestDrive 'NoDocumentation.psd1'
+        $outputPath = Join-Path $TestDrive 'no-documentation-output'
+        Set-Content -LiteralPath $specificationPath -Value '@{ ModuleName = ''NoDocumentationExample'' }'
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+
+        Join-Path $outputPath 'Documentation' | Should -Not -Exist
+    }
+}
+
 Describe 'Install-ContainerModule' {
     BeforeEach {
         $global:dockerCalls = [System.Collections.Generic.List[string]]::new()
