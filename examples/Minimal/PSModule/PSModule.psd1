@@ -11,6 +11,7 @@
             Parameters = @(
                 @{
                     Name      = 'Repository'
+                    Description = 'Repository directory mounted read-only at /repository.'
                     Type      = 'DirectoryInfo'
                     Mandatory = $true
 
@@ -24,6 +25,7 @@
                 }
                 @{
                     Name      = 'Message'
+                    Description = 'Message passed to the example container.'
                     Type      = 'string'
                     Mandatory = $true
 

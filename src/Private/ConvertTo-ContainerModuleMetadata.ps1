@@ -21,6 +21,7 @@ function ConvertTo-ContainerModuleMetadata {
                             [ordered] @{
                                 Id        = $parameter.Id
                                 Name      = $parameter.Name
+                                Description = $parameter.Description
                                 Type      = $parameter.Type
                                 Mandatory = $parameter.Mandatory
                                 Mappings  = @(

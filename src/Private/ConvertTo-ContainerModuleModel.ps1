@@ -27,6 +27,7 @@ function ConvertTo-ContainerModuleModel {
                                 PSTypeName = 'SubZeroDev.ContainerPSGenerator.Model.Parameter'
                                 Id         = $parameter['Id']
                                 Name       = $parameter['Name']
+                                Description = $parameter['Description']
                                 Type       = $parameter['Type']
                                 Mandatory  = if ($parameter.Contains('Mandatory')) { $parameter['Mandatory'] } else { $false }
                                 Mappings   = $mappings
