@@ -461,6 +461,8 @@ The specification contains:
 
 Command and parameter `Description` values are rendered as comment-based help. Generated commands support PowerShell's common `-WhatIf` parameter and display the planned Docker invocation without executing it.
 
+Commands may define `Synopsis`, `Description`, and `Notes` as non-empty strings. For compatibility, `Description` is used as the synopsis when `Synopsis` is omitted.
+
 Long-form documentation may be supplied through Markdown.
 
 ---
@@ -468,6 +470,17 @@ Long-form documentation may be supplied through Markdown.
 # Examples
 
 Examples are structured objects.
+
+Each example requires non-empty `Code` and `Description` strings:
+
+```powershell
+Examples = @(
+    @{
+        Code = "Invoke-BuildAgent -Repository . -Task Build"
+        Description = "Builds the current repository."
+    }
+)
+```
 
 The generator renders them into:
 

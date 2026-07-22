@@ -12,19 +12,47 @@ function ConvertTo-ContainerModuleCommandSource {
     $lines.Add("function $($Command.Name) {")
     $lines.Add('    <#')
     $lines.Add('    .SYNOPSIS')
-    $commandDescription = if ([string]::IsNullOrWhiteSpace($Command.Description)) {
-        "Runs the $($Command.Name) container command."
+    $commandSynopsis = if (-not [string]::IsNullOrWhiteSpace($Command.Synopsis)) {
+        $Command.Synopsis
     }
-    else {
+    elseif (-not [string]::IsNullOrWhiteSpace($Command.Description)) {
         $Command.Description
     }
-    foreach ($descriptionLine in $commandDescription.Replace('#>', '# >') -split "`r?`n") {
+    else {
+        "Runs the $($Command.Name) container command."
+    }
+    foreach ($descriptionLine in $commandSynopsis.Replace('#>', '# >') -split "`r?`n") {
         $lines.Add("    $descriptionLine")
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Command.Description) -and $Command.Description -ne $commandSynopsis) {
+        $lines.Add('')
+        $lines.Add('    .DESCRIPTION')
+        foreach ($descriptionLine in $Command.Description.Replace('#>', '# >') -split "`r?`n") {
+            $lines.Add("    $descriptionLine")
+        }
     }
     foreach ($parameter in $Command.Parameters | Where-Object { -not [string]::IsNullOrWhiteSpace($_.Description) }) {
         $lines.Add('')
         $lines.Add("    .PARAMETER $($parameter.Name)")
         foreach ($descriptionLine in $parameter.Description.Replace('#>', '# >') -split "`r?`n") {
+            $lines.Add("    $descriptionLine")
+        }
+    }
+    if (-not [string]::IsNullOrWhiteSpace($Command.Notes)) {
+        $lines.Add('')
+        $lines.Add('    .NOTES')
+        foreach ($notesLine in $Command.Notes.Replace('#>', '# >') -split "`r?`n") {
+            $lines.Add("    $notesLine")
+        }
+    }
+    foreach ($example in $Command.Examples) {
+        $lines.Add('')
+        $lines.Add('    .EXAMPLE')
+        foreach ($codeLine in $example.Code.Replace('#>', '# >') -split "`r?`n") {
+            $lines.Add("    $codeLine")
+        }
+        $lines.Add('')
+        foreach ($descriptionLine in $example.Description.Replace('#>', '# >') -split "`r?`n") {
             $lines.Add("    $descriptionLine")
         }
     }

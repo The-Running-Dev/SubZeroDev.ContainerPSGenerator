@@ -41,12 +41,39 @@ function Assert-ContainerModuleCommands {
             )
         }
 
-        if ($command.Contains('Description')) {
-            $description = $command['Description']
-            if ($description -isnot [string] -or [string]::IsNullOrWhiteSpace($description)) {
+        foreach ($propertyName in @('Synopsis', 'Description', 'Notes')) {
+            if ($command.Contains($propertyName) -and
+                ($command[$propertyName] -isnot [string] -or [string]::IsNullOrWhiteSpace($command[$propertyName]))) {
                 throw [System.IO.InvalidDataException]::new(
-                    "The 'Description' property for command '$name' must be a non-empty string."
+                    "The '$propertyName' property for command '$name' must be a non-empty string."
                 )
+            }
+        }
+
+        if ($command.Contains('Examples')) {
+            $examples = $command['Examples']
+            if ($examples -isnot [System.Array]) {
+                throw [System.IO.InvalidDataException]::new(
+                    "The 'Examples' property for command '$name' must be an array."
+                )
+            }
+
+            for ($exampleIndex = 0; $exampleIndex -lt $examples.Count; $exampleIndex++) {
+                $example = $examples[$exampleIndex]
+                if ($example -isnot [System.Collections.IDictionary]) {
+                    throw [System.IO.InvalidDataException]::new(
+                        "Example at index $exampleIndex for command '$name' must be an object."
+                    )
+                }
+                foreach ($propertyName in @('Code', 'Description')) {
+                    if (-not $example.Contains($propertyName) -or
+                        $example[$propertyName] -isnot [string] -or
+                        [string]::IsNullOrWhiteSpace($example[$propertyName])) {
+                        throw [System.IO.InvalidDataException]::new(
+                            "The '$propertyName' property for example at index $exampleIndex on command '$name' must be a non-empty string."
+                        )
+                    }
+                }
             }
         }
 

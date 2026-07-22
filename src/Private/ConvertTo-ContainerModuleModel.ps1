@@ -53,7 +53,21 @@ function ConvertTo-ContainerModuleModel {
                     PSTypeName  = 'SubZeroDev.ContainerPSGenerator.Model.Command'
                     Id          = $command['Id']
                     Name        = $command['Name']
+                    Synopsis    = $command['Synopsis']
                     Description = $command['Description']
+                    Notes       = $command['Notes']
+                    Examples    = @(
+                        if ($command.Contains('Examples')) {
+                            foreach ($example in $command['Examples']) {
+                                [pscustomobject] @{
+                                    PSTypeName  = 'SubZeroDev.ContainerPSGenerator.Model.Example'
+                                    Code        = $example['Code']
+                                    Description = $example['Description']
+                                    Definition  = $example
+                                }
+                            }
+                        }
+                    )
                     Parameters  = $parameters
                     Definition  = $command
                 }
