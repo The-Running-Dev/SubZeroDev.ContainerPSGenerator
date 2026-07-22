@@ -47,6 +47,23 @@ function ConvertTo-ContainerModuleCommandSource {
             }
 
             $lines.Add("        [Parameter($mandatory)]")
+            foreach ($validation in $parameter.Validations) {
+                switch ($validation.Type) {
+                    'ValidateSet' {
+                        $values = $validation.Definition['Values'] | ForEach-Object { "'$($_.Replace("'", "''"))'" }
+                        $lines.Add("        [ValidateSet($($values -join ', '))]")
+                    }
+                    'ValidateRange' {
+                        $minimum = [System.Convert]::ToString($validation.Definition['Minimum'], [System.Globalization.CultureInfo]::InvariantCulture)
+                        $maximum = [System.Convert]::ToString($validation.Definition['Maximum'], [System.Globalization.CultureInfo]::InvariantCulture)
+                        $lines.Add("        [ValidateRange($minimum, $maximum)]")
+                    }
+                    'ValidatePattern' {
+                        $pattern = $validation.Definition['Pattern'].Replace("'", "''")
+                        $lines.Add("        [ValidatePattern('$pattern')]")
+                    }
+                }
+            }
             $lines.Add("        [$parameterType] `$$($parameter.Name)$separator")
         }
         $lines.Add('    )')

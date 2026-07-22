@@ -542,6 +542,60 @@ Describe 'Mount mapping validation' {
     }
 }
 
+Describe 'Parameter validation attributes' {
+    It 'normalizes and renders supported native validation attributes' {
+        $specificationPath = Join-Path $TestDrive 'Validations.psd1'
+        $outputPath = Join-Path $TestDrive 'validation-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'ValidationExample'
+    Commands = @(@{ Name = 'Invoke-ValidationExample'; Parameters = @(
+        @{ Name = 'Task'; Type = 'string'; Validations = @(
+            @{ Type = 'ValidateSet'; Values = @('Build', 'Test') }
+            @{ Type = 'ValidatePattern'; Pattern = '^[A-Z][a-z]+$' }
+        ) }
+        @{ Name = 'Count'; Type = 'int'; Validations = @(
+            @{ Type = 'ValidateRange'; Minimum = 1; Maximum = 10 }
+        ) }
+    ) })
+}
+'@
+
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $source = Get-Content -LiteralPath (Join-Path $outputPath 'Public' 'Invoke-ValidationExample.ps1') -Raw
+        $module = Import-Module (Join-Path $outputPath 'ValidationExample.psd1') -Force -PassThru
+        try {
+            $model.Commands[0].Parameters[0].Validations.Count | Should -Be 2
+            $model.Commands[0].Parameters[0].Validations[0].Type | Should -Be 'ValidateSet'
+            $source | Should -Match "\[ValidateSet\('Build', 'Test'\)\]"
+            $source | Should -Match '\[ValidatePattern\(''\^\[A-Z\]\[a-z\]\+\$''\)\]'
+            $source | Should -Match '\[ValidateRange\(1, 10\)\]'
+            { Invoke-ValidationExample -Task Deploy -Count 5 } | Should -Throw -ExceptionType ([System.Management.Automation.ParameterBindingException])
+            { Invoke-ValidationExample -Task Build -Count 11 } | Should -Throw -ExceptionType ([System.Management.Automation.ParameterBindingException])
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed validation definitions' {
+        $unsupportedPath = Join-Path $TestDrive 'UnsupportedValidation.psd1'
+        $emptySetPath = Join-Path $TestDrive 'EmptySet.psd1'
+        $reversedRangePath = Join-Path $TestDrive 'ReversedRange.psd1'
+        $invalidPatternPath = Join-Path $TestDrive 'InvalidPattern.psd1'
+        Set-Content -LiteralPath $unsupportedPath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Validations = @(@{ Type = 'ValidateScript' }) }) }) }"
+        Set-Content -LiteralPath $emptySetPath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Validations = @(@{ Type = 'ValidateSet'; Values = @() }) }) }) }"
+        Set-Content -LiteralPath $reversedRangePath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'int'; Validations = @(@{ Type = 'ValidateRange'; Minimum = 10; Maximum = 1 }) }) }) }"
+        Set-Content -LiteralPath $invalidPatternPath -Value "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Value'; Type = 'string'; Validations = @(@{ Type = 'ValidatePattern'; Pattern = '[' }) }) }) }"
+
+        { Test-ContainerModuleSpecification $unsupportedPath } | Should -Throw -ExpectedMessage '*not supported*'
+        { Test-ContainerModuleSpecification $emptySetPath } | Should -Throw -ExpectedMessage '*non-empty string array*'
+        { Test-ContainerModuleSpecification $reversedRangePath } | Should -Throw -ExpectedMessage '*ascending order*'
+        { Test-ContainerModuleSpecification $invalidPatternPath } | Should -Throw -ExpectedMessage '*invalid regular expression*'
+    }
+}
+
 Describe 'Container module object model' {
     It 'normalizes a specification without commands to an empty collection' {
         InModuleScope SubZeroDev.ContainerPSGenerator {

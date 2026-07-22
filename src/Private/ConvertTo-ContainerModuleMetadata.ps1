@@ -24,6 +24,15 @@ function ConvertTo-ContainerModuleMetadata {
                                 Description = $parameter.Description
                                 Type      = $parameter.Type
                                 Mandatory = $parameter.Mandatory
+                                Validations = @(
+                                    foreach ($validation in $parameter.Validations) {
+                                        $metadata = [ordered] @{ Type = $validation.Type }
+                                        foreach ($key in @($validation.Definition.Keys | Sort-Object)) {
+                                            if ($key -ne 'Type') { $metadata[$key] = $validation.Definition[$key] }
+                                        }
+                                        $metadata
+                                    }
+                                )
                                 Mappings  = @(
                                     foreach ($mapping in $parameter.Mappings) {
                                         $metadata = [ordered] @{ Type = $mapping.Type }
