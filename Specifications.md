@@ -529,6 +529,10 @@ Generated commands place environment mappings before the image reference and arg
 
 `WorkingDirectory` mappings use a string parameter and emit `--workdir`. A command may define at most one working-directory mapping, and bound values cannot be empty.
 
+`Volume` mappings use a string parameter for the Docker volume name and require an absolute container `Target` plus `ReadOnly` or `ReadWrite` access. They emit Docker `--mount type=volume` options.
+
+`RuntimeOption` mappings require a lowercase long-option `Name`, such as `--network`. Switch parameters emit the option alone; other parameters emit option/value pairs before the image reference, repeating pairs for array values.
+
 A parameter may define multiple mappings.
 
 ---

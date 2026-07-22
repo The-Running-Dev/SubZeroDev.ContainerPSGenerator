@@ -630,6 +630,91 @@ Describe 'Port and working-directory mappings' {
     }
 }
 
+Describe 'Volume and runtime-option mappings' {
+    It 'generates named volume mounts and repeated pre-image runtime options' {
+        $specificationPath = Join-Path $TestDrive 'VolumeOptions.psd1'
+        $outputPath = Join-Path $TestDrive 'volume-option-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'VolumeOptionExample'
+    ContainerImage = 'example/volume-tool'
+    Commands = @(@{ Name = 'Invoke-VolumeOptionExample'; Parameters = @(
+        @{ Name = 'Cache'; Type = 'string'; Mappings = @(
+            @{ Type = 'Volume'; Target = '/cache'; Access = 'ReadOnly' }
+        ) }
+        @{ Name = 'Labels'; Type = 'string[]'; Mappings = @(
+            @{ Type = 'RuntimeOption'; Name = '--label' }
+        ) }
+        @{ Name = 'Privileged'; Type = 'switch'; Mappings = @(
+            @{ Type = 'RuntimeOption'; Name = '--privileged' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'VolumeOptionExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args); $global:LASTEXITCODE = 0 }
+        try {
+            Invoke-VolumeOptionExample -Cache 'build-cache' -Labels @('team=dev', 'stage=test') -Privileged
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm', '--mount', 'type=volume,source=build-cache,target=/cache,readonly',
+                '--label', 'team=dev', '--label', 'stage=test', '--privileged',
+                'example/volume-tool'
+            )
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects an unsafe bound Docker volume name before invocation' {
+        $specificationPath = Join-Path $TestDrive 'VolumeValue.psd1'
+        $outputPath = Join-Path $TestDrive 'volume-value-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'VolumeValueExample'; Commands = @(@{ Name = 'Invoke-VolumeValueExample'; Parameters = @(
+    @{ Name = 'Cache'; Type = 'string'; Mappings = @(
+        @{ Type = 'Volume'; Target = '/cache'; Access = 'ReadWrite' }
+    ) }
+) }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'VolumeValueExample.psd1') -Force -PassThru
+        $global:dockerWasInvoked = $false
+        function global:docker { $global:dockerWasInvoked = $true }
+        try {
+            { Invoke-VolumeValueExample -Cache '../unsafe' } | Should -Throw -ExceptionType ([System.ArgumentException])
+            $global:dockerWasInvoked | Should -BeFalse
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable dockerWasInvoked -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed volume and runtime-option definitions' {
+        $invalidVolumeTypePath = Join-Path $TestDrive 'InvalidVolumeType.psd1'
+        $invalidVolumeTargetPath = Join-Path $TestDrive 'InvalidVolumeTarget.psd1'
+        $invalidVolumeAccessPath = Join-Path $TestDrive 'InvalidVolumeAccess.psd1'
+        $invalidOptionPath = Join-Path $TestDrive 'InvalidRuntimeOption.psd1'
+        Set-Content $invalidVolumeTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Volume'; Type = 'int'; Mappings = @(@{ Type = 'Volume'; Target = '/cache'; Access = 'ReadOnly' }) }) }) }"
+        Set-Content $invalidVolumeTargetPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Volume'; Type = 'string'; Mappings = @(@{ Type = 'Volume'; Target = 'cache'; Access = 'ReadOnly' }) }) }) }"
+        Set-Content $invalidVolumeAccessPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Volume'; Type = 'string'; Mappings = @(@{ Type = 'Volume'; Target = '/cache'; Access = 'OwnerOnly' }) }) }) }"
+        Set-Content $invalidOptionPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Network'; Type = 'string'; Mappings = @(@{ Type = 'RuntimeOption'; Name = '-n' }) }) }) }"
+
+        { Test-ContainerModuleSpecification $invalidVolumeTypePath } | Should -Throw -ExpectedMessage "*Volume*mapping*must use type 'string'*"
+        { Test-ContainerModuleSpecification $invalidVolumeTargetPath } | Should -Throw -ExpectedMessage "*'Target'*absolute container path*"
+        { Test-ContainerModuleSpecification $invalidVolumeAccessPath } | Should -Throw -ExpectedMessage "*'Access'*'ReadOnly' or 'ReadWrite'*"
+        { Test-ContainerModuleSpecification $invalidOptionPath } | Should -Throw -ExpectedMessage "*'Name'*RuntimeOption*beginning with '--'*"
+    }
+}
+
 Describe 'Parameter validation attributes' {
     It 'normalizes and renders supported native validation attributes' {
         $specificationPath = Join-Path $TestDrive 'Validations.psd1'

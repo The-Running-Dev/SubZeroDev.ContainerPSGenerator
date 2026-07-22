@@ -40,6 +40,32 @@ function Assert-ContainerModuleRuntimeMappings {
                             )
                         }
                     }
+                    'Volume' {
+                        if ($parameter['Type'] -ne 'string') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Volume mapping parameter '$($parameter['Name'])' on command '$($command['Name'])' must use type 'string'."
+                            )
+                        }
+                        $target = $mapping['Target']
+                        if ($target -isnot [string] -or $target -notmatch '^/[^,]+$') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Target' property for Volume mapping on parameter '$($parameter['Name'])' must be an absolute container path without commas."
+                            )
+                        }
+                        if ($mapping['Access'] -notin @('ReadOnly', 'ReadWrite')) {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Access' property for Volume mapping on parameter '$($parameter['Name'])' must be 'ReadOnly' or 'ReadWrite'."
+                            )
+                        }
+                    }
+                    'RuntimeOption' {
+                        $name = $mapping['Name']
+                        if ($name -isnot [string] -or $name -notmatch '^--[a-z0-9][a-z0-9-]*$') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Name' property for RuntimeOption mapping on parameter '$($parameter['Name'])' must be a lowercase long Docker option beginning with '--'."
+                            )
+                        }
+                    }
                 }
             }
         }
