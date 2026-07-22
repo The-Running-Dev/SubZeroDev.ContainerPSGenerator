@@ -72,6 +72,36 @@ src/
 └── Private/
 ```
 
+### Try the module locally
+
+From the repository root, import the development manifest:
+
+```powershell
+Import-Module ./src/SubZeroDev.ContainerPSGenerator.psd1 -Force
+Get-Command -Module SubZeroDev.ContainerPSGenerator
+```
+
+Validate the included example specification:
+
+```powershell
+Test-ContainerModuleSpecification `
+    -Specification ./examples/Minimal/PSModule/PSModule.psd1
+```
+
+A valid specification returns `True`. Invalid files produce a focused error identifying the first rule that failed. Copy the example PSD1 to experiment with command and parameter definitions.
+
+`Build-ContainerModule` currently loads and validates the specification, then stops at the not-yet-implemented generation boundary. You can exercise that boundary with:
+
+```powershell
+Build-ContainerModule `
+    -Specification ./examples/Minimal/PSModule/PSModule.psd1 `
+    -Output ./artifacts/PSModule
+```
+
+Until generation is implemented, the final `NotImplementedException` from that command is expected.
+
+### Run the tests
+
 Run the fast test suite directly with Pester:
 
 ```powershell

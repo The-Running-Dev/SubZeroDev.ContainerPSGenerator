@@ -8,6 +8,7 @@
 
     FunctionsToExport = @(
         'Build-ContainerModule'
+        'Test-ContainerModuleSpecification'
     )
 
     CmdletsToExport   = @()
