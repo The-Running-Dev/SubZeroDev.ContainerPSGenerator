@@ -21,5 +21,6 @@ function New-ContainerModuleBuildContext {
         SpecificationPath = $resolvedSpecificationPath
         OutputPath        = $resolvedOutputPath
         Specification     = $specification
+        Model             = $null
     }
 }
