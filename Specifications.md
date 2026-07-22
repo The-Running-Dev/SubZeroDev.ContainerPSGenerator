@@ -341,6 +341,8 @@ Commands = @(
 
 Parameters are arrays of typed objects.
 
+The `Parameters` property is optional on a command. When present, it must be an array. Each parameter must define a non-empty string `Name` and `Type`. Parameter names must be unique within their command without regard to case. When specified, `Mandatory` must be Boolean.
+
 ```powershell
 Parameters = @(
     @{

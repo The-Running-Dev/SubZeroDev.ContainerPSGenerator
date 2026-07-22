@@ -62,6 +62,16 @@ See [Specifications.md](Specifications.md) for the Version 1 working draft, incl
 
 ## Development
 
+The module source is stored directly under `src/`:
+
+```text
+src/
+├── SubZeroDev.ContainerPSGenerator.psd1
+├── SubZeroDev.ContainerPSGenerator.psm1
+├── Public/
+└── Private/
+```
+
 Run the fast test suite directly with Pester:
 
 ```powershell

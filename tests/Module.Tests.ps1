@@ -1,5 +1,5 @@
 BeforeAll {
-    $manifestPath = Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator' 'SubZeroDev.ContainerPSGenerator.psd1'
+    $manifestPath = Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator.psd1'
     Import-Module $manifestPath -Force
 }
 
@@ -151,6 +151,106 @@ Describe 'Build-ContainerModule command validation' {
     Commands = @(
         @{ Name = 'Invoke-Example' }
         @{ Name = 'invoke-example' }
+    )
+}
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*defined more than once*'
+    }
+}
+
+Describe 'Build-ContainerModule parameter validation' {
+    BeforeEach {
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'allows a command with no parameters' {
+        Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(@{ Name = ''Invoke-Example'' }) }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.NotImplementedException])
+    }
+
+    It 'allows a valid parameter array' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{
+    Commands = @(
+        @{
+            Name = 'Invoke-Example'
+            Parameters = @(
+                @{ Name = 'Path'; Type = 'string'; Mandatory = $true }
+                @{ Name = 'Force'; Type = 'switch' }
+            )
+        }
+    )
+}
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.NotImplementedException])
+    }
+
+    It 'requires Parameters to be an array' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @{ Name = 'Path'; Type = 'string' } }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Parameters' property for command 'Invoke-Example' must be an array*"
+    }
+
+    It 'requires each parameter to be an object' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @('Path') }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*Parameter at index 0*must be an object*'
+    }
+
+    It 'requires each parameter to have a non-empty string name' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = ''; Type = 'string' }) }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Name'*"
+    }
+
+    It 'requires each parameter to have a non-empty string type' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Path' }) }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Type'*"
+    }
+
+    It 'requires Mandatory to be Boolean when specified' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Path'; Type = 'string'; Mandatory = 'yes' }) }) }
+'@
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Mandatory' property*must be Boolean*"
+    }
+
+    It 'rejects case-insensitive duplicate parameter names within a command' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{
+    Commands = @(
+        @{
+            Name = 'Invoke-Example'
+            Parameters = @(
+                @{ Name = 'Path'; Type = 'string' }
+                @{ Name = 'path'; Type = 'string' }
+            )
+        }
     )
 }
 '@
