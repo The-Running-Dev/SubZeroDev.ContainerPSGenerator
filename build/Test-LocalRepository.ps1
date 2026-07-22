@@ -16,8 +16,7 @@ Specification path relative to Repository, or an absolute path.
 Generation output path relative to Repository, or an absolute path.
 
 .PARAMETER Generate
-Runs Build-ContainerModule after model validation. Generation is not implemented yet, so
-the current expected result is the documented NotImplementedException boundary.
+Runs Build-ContainerModule after model validation and returns the generated artifacts.
 #>
 [CmdletBinding()]
 param (

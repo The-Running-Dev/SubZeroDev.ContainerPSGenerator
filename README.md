@@ -90,7 +90,7 @@ Test-ContainerModuleSpecification `
 
 A valid specification returns `True`. Invalid files produce a focused error identifying the first rule that failed. Copy the example PSD1 to experiment with command and parameter definitions.
 
-`Build-ContainerModule` currently loads and validates the specification, then stops at the not-yet-implemented generation boundary. You can exercise that boundary with:
+`Build-ContainerModule` currently loads and validates the specification, builds the normalized model, and writes its deterministic metadata snapshot:
 
 ```powershell
 Build-ContainerModule `
@@ -98,7 +98,7 @@ Build-ContainerModule `
     -Output ./artifacts/PSModule
 ```
 
-Until generation is implemented, the final `NotImplementedException` from that command is expected.
+The first generated artifact is `./artifacts/PSModule/Metadata/model.json`. PowerShell module source and manifests will be added in later slices.
 
 ### Test another local repository
 
@@ -125,7 +125,7 @@ To continue into the generation pipeline, add `-Generate`:
     -Generate
 ```
 
-The harness already invokes the real `Build-ContainerModule` entry point. Until file generation is implemented, `-Generate` reaches the expected `NotImplementedException`; the same command will produce artifacts as generation stages are added.
+The harness invokes the real `Build-ContainerModule` entry point. It currently returns the generated `Metadata/model.json`; additional module artifacts will appear through the same command as generation stages are added.
 
 ### Run the tests
 
