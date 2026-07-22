@@ -1,5 +1,5 @@
 BeforeAll {
-    $manifestPath = Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator' 'SubZeroDev.ContainerPSGenerator.psd1'
+    $manifestPath = Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator.psd1'
     Import-Module $manifestPath -Force
 }
 
@@ -171,6 +171,25 @@ Describe 'Build-ContainerModule parameter validation' {
 
     It 'allows a command with no parameters' {
         Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(@{ Name = ''Invoke-Example'' }) }'
+
+        { Build-ContainerModule -Specification './Specification.psd1' } |
+            Should -Throw -ExceptionType ([System.NotImplementedException])
+    }
+
+    It 'allows a valid parameter array' {
+        Set-Content -LiteralPath './Specification.psd1' -Value @'
+@{
+    Commands = @(
+        @{
+            Name = 'Invoke-Example'
+            Parameters = @(
+                @{ Name = 'Path'; Type = 'string'; Mandatory = $true }
+                @{ Name = 'Force'; Type = 'switch' }
+            )
+        }
+    )
+}
+'@
 
         { Build-ContainerModule -Specification './Specification.psd1' } |
             Should -Throw -ExceptionType ([System.NotImplementedException])
