@@ -366,3 +366,59 @@ Describe 'Container module mapping validation' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*must define a non-empty string 'Type'*"
     }
 }
+
+Describe 'Named mapping validation' {
+    It 'allows named Argument and Environment mappings' {
+        $specificationPath = Join-Path $TestDrive 'NamedMappings.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{
+                Name = 'Message'
+                Type = 'string'
+                Mappings = @(
+                    @{ Type = 'Argument'; Name = '--message' }
+                    @{ Type = 'Environment'; Name = 'EXAMPLE_MESSAGE' }
+                )
+            }
+        ) }
+    )
+}
+'@
+
+        Test-ContainerModuleSpecification -Specification $specificationPath | Should -BeTrue
+    }
+
+    It 'requires an Argument mapping name' {
+        $specificationPath = Join-Path $TestDrive 'UnnamedArgument.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @(@{ Type = 'Argument' }) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Name' property for Argument mapping*must be a non-empty string*"
+    }
+
+    It 'requires an Environment mapping name' {
+        $specificationPath = Join-Path $TestDrive 'UnnamedEnvironment.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @(@{ Type = 'Environment'; Name = ' ' }) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Name' property for Environment mapping*must be a non-empty string*"
+    }
+}

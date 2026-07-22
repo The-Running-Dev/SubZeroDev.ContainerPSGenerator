@@ -8,4 +8,5 @@ function Assert-ContainerModuleSpecification {
     Assert-ContainerModuleCommands -Specification $Specification
     Assert-ContainerModuleParameters -Specification $Specification
     Assert-ContainerModuleMappings -Specification $Specification
+    Assert-ContainerModuleNamedMappings -Specification $Specification
 }
