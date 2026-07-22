@@ -68,15 +68,17 @@ Describe 'Build-ContainerModule specification loading' {
     }
 
     It 'loads the conventional specification path by default' {
-        { Build-ContainerModule } |
-            Should -Throw -ExceptionType ([System.NotImplementedException]) -ExpectedMessage "*Specification: 'PSModule/PSModule.psd1'; Output: 'artifacts/PSModule'*"
+        $artifact = Build-ContainerModule
+
+        $artifact.FullName | Should -Be (Join-Path $TestDrive 'artifacts' 'PSModule' 'Metadata' 'model.json')
     }
 
     It 'loads an explicitly selected specification' {
         Set-Content -LiteralPath (Join-Path $TestDrive 'Custom.psd1') -Value '@{ Commands = @() }'
 
-        { Build-ContainerModule -Specification './Custom.psd1' -Output './dist' } |
-            Should -Throw -ExceptionType ([System.NotImplementedException]) -ExpectedMessage "*Specification: './Custom.psd1'; Output: './dist'*"
+        $artifact = Build-ContainerModule -Specification './Custom.psd1' -Output './dist'
+
+        $artifact.FullName | Should -Be (Join-Path $TestDrive 'dist' 'Metadata' 'model.json')
     }
 
     It 'rejects a missing specification' {
@@ -153,8 +155,7 @@ Describe 'Build-ContainerModule command validation' {
     It 'allows a specification with no commands' {
         Set-Content -LiteralPath './Specification.psd1' -Value '@{}'
 
-        { Build-ContainerModule -Specification './Specification.psd1' } |
-            Should -Throw -ExceptionType ([System.NotImplementedException])
+        { Build-ContainerModule -Specification './Specification.psd1' } | Should -Not -Throw
     }
 
     It 'requires Commands to be an array' {
@@ -205,8 +206,7 @@ Describe 'Build-ContainerModule parameter validation' {
     It 'allows a command with no parameters' {
         Set-Content -LiteralPath './Specification.psd1' -Value '@{ Commands = @(@{ Name = ''Invoke-Example'' }) }'
 
-        { Build-ContainerModule -Specification './Specification.psd1' } |
-            Should -Throw -ExceptionType ([System.NotImplementedException])
+        { Build-ContainerModule -Specification './Specification.psd1' } | Should -Not -Throw
     }
 
     It 'allows a valid parameter array' {
@@ -224,8 +224,7 @@ Describe 'Build-ContainerModule parameter validation' {
 }
 '@
 
-        { Build-ContainerModule -Specification './Specification.psd1' } |
-            Should -Throw -ExceptionType ([System.NotImplementedException])
+        { Build-ContainerModule -Specification './Specification.psd1' } | Should -Not -Throw
     }
 
     It 'requires Parameters to be an array' {
@@ -549,6 +548,37 @@ Describe 'Get-ContainerModuleModel' {
     }
 }
 
+Describe 'Container module metadata generation' {
+    It 'writes deterministic normalized JSON using UTF-8 without BOM' {
+        $specificationPath = Join-Path $TestDrive 'Metadata.psd1'
+        $outputPath = Join-Path $TestDrive 'metadata-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Message'; Type = 'string'; Mappings = @(
+                @{ Type = 'Environment'; Name = 'EXAMPLE_MESSAGE' }
+            ) }
+        ) }
+    )
+}
+'@
+
+        $artifact = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        $firstContent = [System.IO.File]::ReadAllText($artifact.FullName)
+        $firstBytes = [System.IO.File]::ReadAllBytes($artifact.FullName)
+        $metadata = $firstContent | ConvertFrom-Json
+
+        $metadata.SchemaVersion | Should -Be 1
+        $metadata.Commands[0].Parameters[0].Mappings[0].Name | Should -Be 'EXAMPLE_MESSAGE'
+        $firstContent | Should -Not -Match "`r`n"
+        $firstBytes[0] | Should -Not -Be 0xEF
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        [System.IO.File]::ReadAllText($artifact.FullName) | Should -BeExactly $firstContent
+    }
+}
+
 Describe 'Test-LocalRepository script' {
     BeforeAll {
         $repositoryPath = Join-Path $TestDrive 'Repository'
@@ -569,11 +599,12 @@ Describe 'Test-LocalRepository script' {
         (Get-Location).Path | Should -Be $originalLocation.Path
     }
 
-    It 'can exercise the current generation boundary and restores the caller location' {
+    It 'generates repository metadata and restores the caller location' {
         $originalLocation = Get-Location
 
-        { & $scriptPath -Repository $repositoryPath -Generate } |
-            Should -Throw -ExceptionType ([System.NotImplementedException])
+        $artifact = & $scriptPath -Repository $repositoryPath -Generate -Output './generated'
+
+        $artifact.FullName | Should -Be (Join-Path $repositoryPath 'generated' 'Metadata' 'model.json')
         (Get-Location).Path | Should -Be $originalLocation.Path
     }
 }
