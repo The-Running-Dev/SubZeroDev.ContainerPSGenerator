@@ -531,6 +531,7 @@ Describe 'Container module object model' {
             $model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
             $model.ModuleName | Should -Be 'PSModule'
             $model.ModuleVersion | Should -Be '0.1.0'
+            $model.ContainerImage | Should -Be 'PSModule'
             [object]::ReferenceEquals($null, $model.Commands) | Should -BeFalse
             $model.Commands.Count | Should -Be 0
         }
@@ -683,7 +684,6 @@ Describe 'Container module loader generation' {
         try {
             $module.Name | Should -Be 'ExampleContainer'
             Get-Command Invoke-Example -Module ExampleContainer | Should -Not -BeNullOrEmpty
-            { Invoke-Example } | Should -Throw -ExceptionType ([System.NotImplementedException])
         }
         finally {
             Remove-Module ExampleContainer -Force
@@ -759,6 +759,107 @@ Describe 'Container module output reset' {
         { Build-ContainerModule -Specification $specificationPath -Output $outputPath } | Should -Throw
 
         Test-Path -LiteralPath (Join-Path $outputPath 'keep.txt') | Should -BeTrue
+    }
+}
+
+Describe 'Container runtime configuration' {
+    It 'normalizes an explicit container image into the model and metadata' {
+        $specificationPath = Join-Path $TestDrive 'Runtime.psd1'
+        $outputPath = Join-Path $TestDrive 'runtime-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ContainerImage = 'ghcr.io/example/tool:1.2.3'; Commands = @() }
+'@
+
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+        $artifact = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        $metadata = Get-Content -LiteralPath $artifact -Raw | ConvertFrom-Json
+
+        $model.ContainerImage | Should -Be 'ghcr.io/example/tool:1.2.3'
+        $metadata.ContainerImage | Should -Be 'ghcr.io/example/tool:1.2.3'
+    }
+
+    It 'rejects an unsafe container image reference' {
+        $specificationPath = Join-Path $TestDrive 'UnsafeRuntime.psd1'
+        Set-Content -LiteralPath $specificationPath -Value "@{ ContainerImage = 'bad image' }"
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'ContainerImage' property must be*"
+    }
+}
+
+Describe 'Docker runtime command generation' {
+    It 'maps bound environment and argument parameters in Docker order' {
+        $specificationPath = Join-Path $TestDrive 'DockerCommand.psd1'
+        $outputPath = Join-Path $TestDrive 'docker-command-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'DockerExample'
+    ContainerImage = 'ghcr.io/example/tool:latest'
+    Commands = @(
+        @{
+            Name = 'Invoke-DockerExample'
+            Parameters = @(
+                @{ Name = 'Message'; Type = 'string'; Mappings = @(
+                    @{ Type = 'Environment'; Name = 'TOOL_MESSAGE' }
+                    @{ Type = 'Argument'; Name = '--message' }
+                ) }
+                @{ Name = 'VerboseOutput'; Type = 'switch'; Mappings = @(
+                    @{ Type = 'Argument'; Name = '--verbose' }
+                ) }
+            )
+        }
+    )
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'DockerExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args) }
+        try {
+            Invoke-DockerExample -Message 'hello world' -VerboseOutput
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm', '-e', 'TOOL_MESSAGE=hello world',
+                'ghcr.io/example/tool:latest', '--message', 'hello world', '--verbose'
+            )
+        }
+        finally {
+            Remove-Item -Path Function:\docker -Force
+            Remove-Variable -Name capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'does not emit mappings for omitted optional parameters' {
+        $specificationPath = Join-Path $TestDrive 'OptionalDockerCommand.psd1'
+        $outputPath = Join-Path $TestDrive 'optional-docker-command-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'OptionalDockerExample'
+    ContainerImage = 'example/tool'
+    Commands = @(@{ Name = 'Invoke-OptionalDockerExample'; Parameters = @(
+        @{ Name = 'Message'; Type = 'string'; Mappings = @(
+            @{ Type = 'Argument'; Name = '--message' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'OptionalDockerExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args) }
+        try {
+            Invoke-OptionalDockerExample
+
+            $global:capturedDockerArguments | Should -Be @('run', '--rm', 'example/tool')
+        }
+        finally {
+            Remove-Item -Path Function:\docker -Force
+            Remove-Variable -Name capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
     }
 }
 
