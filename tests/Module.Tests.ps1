@@ -13,14 +13,55 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
     }
 
-    It 'defaults to the conventional specification and output paths' {
+    It 'declares the specification and output parameters' {
         $command = Get-Command Build-ContainerModule -Module SubZeroDev.ContainerPSGenerator
 
         $command.Parameters.Specification.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
 
-        { Build-ContainerModule } | Should -Throw -ExpectedMessage "*Specification: 'PSModule/PSModule.psd1'; Output: 'artifacts/PSModule'*"
+Describe 'Build-ContainerModule specification loading' {
+    BeforeEach {
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'loads the conventional specification path by default' {
+        { Build-ContainerModule } |
+            Should -Throw -ExceptionType ([System.NotImplementedException]) -ExpectedMessage "*Specification: 'PSModule/PSModule.psd1'; Output: 'artifacts/PSModule'*"
+    }
+
+    It 'loads an explicitly selected specification' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'Custom.psd1') -Value '@{ Commands = @() }'
+
+        { Build-ContainerModule -Specification './Custom.psd1' -Output './dist' } |
+            Should -Throw -ExceptionType ([System.NotImplementedException]) -ExpectedMessage "*Specification: './Custom.psd1'; Output: './dist'*"
+    }
+
+    It 'rejects a missing specification' {
+        { Build-ContainerModule -Specification './missing.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.FileNotFoundException]) -ExpectedMessage '*Container module specification was not found*'
+    }
+
+    It 'rejects a specification that is not a PSD1 file' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'Specification.ps1') -Value '@{ Commands = @() }'
+
+        { Build-ContainerModule -Specification './Specification.ps1' } |
+            Should -Throw -ExceptionType ([System.ArgumentException]) -ExpectedMessage "*must be a PowerShell data file with a '.psd1' extension*"
+    }
+
+    It 'rejects malformed PSD1 content' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'Invalid.psd1') -Value '@{ Commands = '
+
+        { Build-ContainerModule -Specification './Invalid.psd1' } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a valid PowerShell data file*'
     }
 }
