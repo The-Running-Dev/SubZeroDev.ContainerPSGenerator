@@ -15,6 +15,10 @@
                             Type = 'Environment'
                             Name = 'EXAMPLE_MESSAGE'
                         }
+                        @{
+                            Type = 'Argument'
+                            Name = '--message'
+                        }
                     )
                 }
             )

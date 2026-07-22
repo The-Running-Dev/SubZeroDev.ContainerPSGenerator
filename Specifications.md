@@ -487,6 +487,8 @@ Supported mappings include:
 - Secrets
 - Runtime options
 
+`Argument` and `Environment` mappings require a non-empty string `Name`.
+
 A parameter may define multiple mappings.
 
 ---
