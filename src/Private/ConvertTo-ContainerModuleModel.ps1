@@ -49,8 +49,10 @@ function ConvertTo-ContainerModuleModel {
     )
 
     [pscustomobject] @{
-        PSTypeName = 'SubZeroDev.ContainerPSGenerator.Model'
-        Commands   = $commands
-        Definition = $Specification
+        PSTypeName    = 'SubZeroDev.ContainerPSGenerator.Model'
+        ModuleName    = if ($Specification.Contains('ModuleName')) { $Specification['ModuleName'] } else { 'PSModule' }
+        ModuleVersion = if ($Specification.Contains('ModuleVersion')) { $Specification['ModuleVersion'] } else { '0.1.0' }
+        Commands      = $commands
+        Definition    = $Specification
     }
 }

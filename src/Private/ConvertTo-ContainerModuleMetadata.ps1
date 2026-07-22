@@ -7,6 +7,8 @@ function ConvertTo-ContainerModuleMetadata {
 
     [ordered] @{
         SchemaVersion = 1
+        ModuleName    = $Model.ModuleName
+        ModuleVersion = $Model.ModuleVersion
         Commands      = @(
             foreach ($command in $Model.Commands) {
                 [ordered] @{

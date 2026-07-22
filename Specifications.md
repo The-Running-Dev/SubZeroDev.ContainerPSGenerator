@@ -316,6 +316,15 @@ Collections are represented as arrays of typed objects.
 
 The specification favors explicit objects over nested hashtables.
 
+Optional module identity properties are:
+
+```powershell
+ModuleName = "BuildAgent"
+ModuleVersion = "0.1.0"
+```
+
+`ModuleName` must be safe for use as a file name and begin with a letter. `ModuleVersion` must be a valid PowerShell version string. When omitted, they default to `PSModule` and `0.1.0`.
+
 ---
 
 # Commands

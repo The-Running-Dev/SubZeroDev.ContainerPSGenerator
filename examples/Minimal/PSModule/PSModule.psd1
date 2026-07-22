@@ -1,4 +1,7 @@
 @{
+    ModuleName = 'ExampleContainer'
+    ModuleVersion = '0.1.0'
+
     Commands = @(
         @{
             Name        = 'Invoke-Example'
