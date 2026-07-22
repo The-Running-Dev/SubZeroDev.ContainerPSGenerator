@@ -8,6 +8,7 @@
 
     FunctionsToExport = @(
         'Build-ContainerModule'
+        'Get-ContainerModuleModel'
         'Test-ContainerModuleSpecification'
     )
 

@@ -100,6 +100,33 @@ Build-ContainerModule `
 
 Until generation is implemented, the final `NotImplementedException` from that command is expected.
 
+### Test another local repository
+
+Point the repository harness at any checkout containing `PSModule/PSModule.psd1`:
+
+```powershell
+./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository
+```
+
+The script imports this checkout of ContainerPSGenerator, validates the target repository's specification, and returns its normalized object model. Select non-default paths when needed:
+
+```powershell
+./build/Test-LocalRepository.ps1 `
+    -Repository ../MyContainerRepository `
+    -Specification ./config/MyModule.psd1 `
+    -Output ./dist
+```
+
+To continue into the generation pipeline, add `-Generate`:
+
+```powershell
+./build/Test-LocalRepository.ps1 `
+    -Repository ../MyContainerRepository `
+    -Generate
+```
+
+The harness already invokes the real `Build-ContainerModule` entry point. Until file generation is implemented, `-Generate` reaches the expected `NotImplementedException`; the same command will produce artifacts as generation stages are added.
+
 ### Run the tests
 
 Run the fast test suite directly with Pester:
