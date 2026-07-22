@@ -60,6 +60,24 @@ See [Specifications.md](Specifications.md) for the Version 1 working draft, incl
 - PowerShell 7 or later
 - Docker
 
+## Development
+
+Run the fast test suite directly with Pester:
+
+```powershell
+Invoke-Pester -Path ./tests -Output Detailed
+```
+
+To exercise the GitHub Actions workflow locally, install [Docker](https://docs.docker.com/get-docker/) and [act](https://nektosact.com/installation/index.html), ensure Docker is running, and execute:
+
+```powershell
+./build/Invoke-CI.ps1
+```
+
+The script builds a local act runner image with PowerShell, then runs the `ubuntu-latest` matrix leg from `.github/workflows/test.yml`. The base images are downloaded on the first run; later runs reuse Docker's build cache.
+
+Act uses Linux containers and cannot faithfully reproduce GitHub's hosted Windows runner. Run the direct Pester command on Windows for fast host-platform feedback; GitHub Actions remains authoritative for both the Windows and Ubuntu jobs.
+
 ## License
 
 No license has been selected yet.
