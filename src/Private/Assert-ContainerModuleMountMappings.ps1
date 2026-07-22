@@ -37,6 +37,12 @@ function Assert-ContainerModuleMountMappings {
                         "The 'Access' property for Mount mapping on parameter '$($parameter['Name'])' in command '$($command['Name'])' must be a non-empty string."
                     )
                 }
+
+                if ($access -notin @('ReadOnly', 'ReadWrite')) {
+                    throw [System.IO.InvalidDataException]::new(
+                        "The 'Access' property for Mount mapping on parameter '$($parameter['Name'])' in command '$($command['Name'])' must be 'ReadOnly' or 'ReadWrite'."
+                    )
+                }
             }
         }
     }

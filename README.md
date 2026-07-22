@@ -114,7 +114,7 @@ Import the generated module through its manifest:
 Import-Module ./artifacts/PSModule/ExampleContainer.psd1 -Force
 ```
 
-The generated manifest declares the module version and exported functions, while the loader imports every public command. Public command files translate `Environment` and `Argument` parameter mappings into a `docker run --rm` invocation using the configured `ContainerImage`. Additional mapping types will be added in later slices.
+The generated manifest declares the module version and exported functions, while the loader imports every public command. Public command files translate `Mount`, `Environment`, and `Argument` parameter mappings into a `docker run --rm` invocation using the configured `ContainerImage`. Generated commands report a focused error when Docker is unavailable or exits unsuccessfully. Additional mapping types will be added in later slices.
 
 ### Test another local repository
 
