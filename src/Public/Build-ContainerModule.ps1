@@ -23,8 +23,7 @@ function Build-ContainerModule {
     )
 
     $context = New-ContainerModuleBuildContext -SpecificationPath $Specification -OutputPath $Output
-    Assert-ContainerModuleCommands -Specification $context.Specification
-    Assert-ContainerModuleParameters -Specification $context.Specification
+    Assert-ContainerModuleSpecification -Specification $context.Specification
 
     throw [System.NotImplementedException]::new(
         "Module generation is not implemented yet. Specification: '$Specification'; Output: '$Output'."

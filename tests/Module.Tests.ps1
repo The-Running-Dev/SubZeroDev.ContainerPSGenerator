@@ -8,9 +8,11 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
         Test-ModuleManifest $manifestPath -ErrorAction Stop | Should -Not -BeNullOrEmpty
     }
 
-    It 'exports Build-ContainerModule' {
-        Get-Command Build-ContainerModule -Module SubZeroDev.ContainerPSGenerator |
-            Should -Not -BeNullOrEmpty
+    It 'exports the public commands' {
+        $exportedCommands = Get-Command -Module SubZeroDev.ContainerPSGenerator
+
+        $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
+        $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
 
     It 'declares the specification and output parameters' {
@@ -20,6 +22,36 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Test-ContainerModuleSpecification' {
+    It 'returns true for a valid specification' {
+        $specificationPath = Join-Path $TestDrive 'Valid.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{
+            Name = 'Invoke-Example'
+            Parameters = @(
+                @{ Name = 'Message'; Type = 'string'; Mandatory = $true }
+            )
+        }
+    )
+}
+'@
+
+        Test-ContainerModuleSpecification -Specification $specificationPath | Should -BeTrue
+    }
+
+    It 'throws the validator error for an invalid specification' {
+        $specificationPath = Join-Path $TestDrive 'Invalid.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Message' }) }) }
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*non-empty string 'Type'*"
     }
 }
 
