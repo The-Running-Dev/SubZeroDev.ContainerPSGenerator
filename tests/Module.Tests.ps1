@@ -12,6 +12,7 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
         $exportedCommands = Get-Command -Module SubZeroDev.ContainerPSGenerator
 
         $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
+        $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
         $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
 
@@ -531,5 +532,48 @@ Describe 'Container module object model' {
             $mapping.Definition.Target | Should -Be '/repository'
             [object]::ReferenceEquals($model.Definition, $definition) | Should -BeTrue
         }
+    }
+}
+
+Describe 'Get-ContainerModuleModel' {
+    It 'returns a validated normalized model' {
+        $specificationPath = Join-Path $TestDrive 'Model.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @() }) }
+'@
+
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+
+        $model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+        $model.Commands[0].Name | Should -Be 'Invoke-Example'
+    }
+}
+
+Describe 'Test-LocalRepository script' {
+    BeforeAll {
+        $repositoryPath = Join-Path $TestDrive 'Repository'
+        $specificationDirectory = Join-Path $repositoryPath 'PSModule'
+        New-Item -Path $specificationDirectory -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $specificationDirectory 'PSModule.psd1') -Value @'
+@{ Commands = @(@{ Name = 'Invoke-ExternalRepository'; Parameters = @() }) }
+'@
+        $scriptPath = Join-Path $PSScriptRoot '..' 'build' 'Test-LocalRepository.ps1'
+    }
+
+    It 'returns the target repository model and restores the caller location' {
+        $originalLocation = Get-Location
+
+        $model = & $scriptPath -Repository $repositoryPath
+
+        $model.Commands[0].Name | Should -Be 'Invoke-ExternalRepository'
+        (Get-Location).Path | Should -Be $originalLocation.Path
+    }
+
+    It 'can exercise the current generation boundary and restores the caller location' {
+        $originalLocation = Get-Location
+
+        { & $scriptPath -Repository $repositoryPath -Generate } |
+            Should -Throw -ExceptionType ([System.NotImplementedException])
+        (Get-Location).Path | Should -Be $originalLocation.Path
     }
 }
