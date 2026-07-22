@@ -104,6 +104,22 @@
                         @{ Type = 'Gpu' }
                     )
                 }
+                @{
+                    Name = 'Memory'
+                    Description = 'Optional container memory limit such as 512m.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'ResourceLimit'; Resource = 'Memory' }
+                    )
+                }
+                @{
+                    Name = 'SecretFile'
+                    Description = 'Optional host secret mounted read-only at /run/secrets/api-token.'
+                    Type = 'FileInfo'
+                    Mappings = @(
+                        @{ Type = 'Secret'; Name = 'api-token' }
+                    )
+                }
             )
         }
     )

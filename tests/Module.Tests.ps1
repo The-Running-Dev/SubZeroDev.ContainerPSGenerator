@@ -862,6 +862,107 @@ Describe 'Device and GPU mappings' {
     }
 }
 
+Describe 'Resource limit and secret mappings' {
+    It 'generates culture-invariant resource limits and read-only secret mounts' {
+        $specificationPath = Join-Path $TestDrive 'Resources.psd1'
+        $outputPath = Join-Path $TestDrive 'resource-output'
+        $secretPath = Join-Path $TestDrive 'api-token.txt'
+        Set-Content -LiteralPath $secretPath -Value 'secret-value'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'ResourceExample'
+    ContainerImage = 'example/resource-tool'
+    Commands = @(@{ Name = 'Invoke-ResourceExample'; Parameters = @(
+        @{ Name = 'Memory'; Type = 'string'; Mappings = @(
+            @{ Type = 'ResourceLimit'; Resource = 'Memory' }
+        ) }
+        @{ Name = 'Cpus'; Type = 'double'; Mappings = @(
+            @{ Type = 'ResourceLimit'; Resource = 'Cpus' }
+        ) }
+        @{ Name = 'Secret'; Type = 'FileInfo'; Mappings = @(
+            @{ Type = 'Secret'; Name = 'api-token' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'ResourceExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args); $global:LASTEXITCODE = 0 }
+        $originalCulture = [System.Globalization.CultureInfo]::CurrentCulture
+        try {
+            [System.Globalization.CultureInfo]::CurrentCulture = [System.Globalization.CultureInfo]::GetCultureInfo('de-DE')
+            Invoke-ResourceExample -Memory '512m' -Cpus 1.5 -Secret $secretPath
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm', '--memory', '512m', '--cpus', '1.5', '--mount',
+                ('type=bind,source=' + [System.IO.Path]::GetFullPath($secretPath) + ',target=/run/secrets/api-token,readonly'),
+                'example/resource-tool'
+            )
+        }
+        finally {
+            [System.Globalization.CultureInfo]::CurrentCulture = $originalCulture
+            Remove-Item Function:\docker -Force
+            Remove-Variable capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects invalid resource values and missing secret files before Docker' {
+        $specificationPath = Join-Path $TestDrive 'ResourceValues.psd1'
+        $outputPath = Join-Path $TestDrive 'resource-value-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'ResourceValueExample'; Commands = @(@{ Name = 'Invoke-ResourceValueExample'; Parameters = @(
+    @{ Name = 'Memory'; Type = 'string'; Mappings = @(@{ Type = 'ResourceLimit'; Resource = 'Memory' }) }
+    @{ Name = 'Cpus'; Type = 'double'; Mappings = @(@{ Type = 'ResourceLimit'; Resource = 'Cpus' }) }
+    @{ Name = 'Secret'; Type = 'FileInfo'; Mappings = @(@{ Type = 'Secret'; Name = 'token' }) }
+) }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'ResourceValueExample.psd1') -Force -PassThru
+        $commaSecretPath = Join-Path $TestDrive 'unsafe,secret'
+        Set-Content -LiteralPath $commaSecretPath -Value 'secret'
+        $global:dockerWasInvoked = $false
+        function global:docker { $global:dockerWasInvoked = $true }
+        try {
+            { Invoke-ResourceValueExample -Memory 'unlimited' } | Should -Throw -ExceptionType ([System.ArgumentException])
+            { Invoke-ResourceValueExample -Cpus 0 } | Should -Throw -ExceptionType ([System.ArgumentOutOfRangeException])
+            { Invoke-ResourceValueExample -Secret (Join-Path $TestDrive 'missing.secret') } | Should -Throw -ExceptionType ([System.IO.FileNotFoundException])
+            { Invoke-ResourceValueExample -Secret $commaSecretPath } | Should -Throw -ExceptionType ([System.ArgumentException])
+            $global:dockerWasInvoked | Should -BeFalse
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable dockerWasInvoked -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed resource limit and secret definitions' {
+        $invalidResourcePath = Join-Path $TestDrive 'InvalidResource.psd1'
+        $invalidMemoryTypePath = Join-Path $TestDrive 'InvalidMemoryType.psd1'
+        $invalidCpuTypePath = Join-Path $TestDrive 'InvalidCpuType.psd1'
+        $invalidSecretTypePath = Join-Path $TestDrive 'InvalidSecretType.psd1'
+        $invalidSecretNamePath = Join-Path $TestDrive 'InvalidSecretName.psd1'
+        $invalidSecretTargetPath = Join-Path $TestDrive 'InvalidSecretTarget.psd1'
+        Set-Content $invalidResourcePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Limit'; Type = 'string'; Mappings = @(@{ Type = 'ResourceLimit'; Resource = 'Disk' }) }) }) }"
+        Set-Content $invalidMemoryTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Memory'; Type = 'int'; Mappings = @(@{ Type = 'ResourceLimit'; Resource = 'Memory' }) }) }) }"
+        Set-Content $invalidCpuTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Cpus'; Type = 'string'; Mappings = @(@{ Type = 'ResourceLimit'; Resource = 'Cpus' }) }) }) }"
+        Set-Content $invalidSecretTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Secret'; Type = 'int'; Mappings = @(@{ Type = 'Secret'; Name = 'token' }) }) }) }"
+        Set-Content $invalidSecretNamePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Secret'; Type = 'string'; Mappings = @(@{ Type = 'Secret'; Name = '../token' }) }) }) }"
+        Set-Content $invalidSecretTargetPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Secret'; Type = 'string'; Mappings = @(@{ Type = 'Secret'; Name = 'token'; Target = 'run/token' }) }) }) }"
+
+        { Test-ContainerModuleSpecification $invalidResourcePath } | Should -Throw -ExpectedMessage "*'Resource'*'Memory' or 'Cpus'*"
+        { Test-ContainerModuleSpecification $invalidMemoryTypePath } | Should -Throw -ExpectedMessage "*Memory ResourceLimit*must use type 'string'*"
+        { Test-ContainerModuleSpecification $invalidCpuTypePath } | Should -Throw -ExpectedMessage "*Cpus ResourceLimit*numeric type*"
+        { Test-ContainerModuleSpecification $invalidSecretTypePath } | Should -Throw -ExpectedMessage "*Secret*mapping*must use type 'string' or 'FileInfo'*"
+        { Test-ContainerModuleSpecification $invalidSecretNamePath } | Should -Throw -ExpectedMessage "*'Name'*Secret mapping*safe non-empty file name*"
+        { Test-ContainerModuleSpecification $invalidSecretTargetPath } | Should -Throw -ExpectedMessage "*'Target'*Secret mapping*absolute container path*"
+    }
+}
+
 Describe 'Parameter validation attributes' {
     It 'normalizes and renders supported native validation attributes' {
         $specificationPath = Join-Path $TestDrive 'Validations.psd1'
