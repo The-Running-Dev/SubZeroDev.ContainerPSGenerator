@@ -6,6 +6,19 @@
 
             Parameters = @(
                 @{
+                    Name      = 'Repository'
+                    Type      = 'DirectoryInfo'
+                    Mandatory = $true
+
+                    Mappings = @(
+                        @{
+                            Type   = 'Mount'
+                            Target = '/repository'
+                            Access = 'ReadOnly'
+                        }
+                    )
+                }
+                @{
                     Name      = 'Message'
                     Type      = 'string'
                     Mandatory = $true

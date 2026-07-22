@@ -489,6 +489,8 @@ Supported mappings include:
 
 `Argument` and `Environment` mappings require a non-empty string `Name`.
 
+`Mount` mappings require a non-empty string container `Target` and a non-empty string `Access` mode.
+
 A parameter may define multiple mappings.
 
 ---

@@ -422,3 +422,60 @@ Describe 'Named mapping validation' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Name' property for Environment mapping*must be a non-empty string*"
     }
 }
+
+Describe 'Mount mapping validation' {
+    It 'allows a Mount mapping with a target and access mode' {
+        $specificationPath = Join-Path $TestDrive 'ValidMount.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{
+                Name = 'Repository'
+                Type = 'DirectoryInfo'
+                Mappings = @(@{ Type = 'Mount'; Target = '/repository'; Access = 'ReadOnly' })
+            }
+        ) }
+    )
+}
+'@
+
+        Test-ContainerModuleSpecification -Specification $specificationPath | Should -BeTrue
+    }
+
+    It 'requires a Mount mapping target' {
+        $specificationPath = Join-Path $TestDrive 'MissingMountTarget.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Repository'; Type = 'DirectoryInfo'; Mappings = @(
+                @{ Type = 'Mount'; Access = 'ReadOnly' }
+            ) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Target' property for Mount mapping*must be a non-empty string*"
+    }
+
+    It 'requires a Mount mapping access mode' {
+        $specificationPath = Join-Path $TestDrive 'MissingMountAccess.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-Example'; Parameters = @(
+            @{ Name = 'Repository'; Type = 'DirectoryInfo'; Mappings = @(
+                @{ Type = 'Mount'; Target = '/repository'; Access = ' ' }
+            ) }
+        ) }
+    )
+}
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Access' property for Mount mapping*must be a non-empty string*"
+    }
+}
