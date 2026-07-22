@@ -546,6 +546,10 @@ Generated commands place environment mappings before the image reference and arg
 
 `RuntimeOption` mappings require a lowercase long-option `Name`, such as `--network`. Switch parameters emit the option alone; other parameters emit option/value pairs before the image reference, repeating pairs for array values.
 
+`Device` mappings use a `string` or `FileInfo` parameter for a host device path. An optional absolute container `Target` and ordered `Permissions` combination of `r`, `w`, and `m` produce Docker `--device` arguments; permissions default to Docker's behavior when omitted.
+
+`Gpu` mappings use a string parameter and emit Docker `--gpus`. Runtime values accept `all`, a positive GPU count, or a device selector such as `device=0,1`.
+
 A parameter may define multiple mappings.
 
 ---

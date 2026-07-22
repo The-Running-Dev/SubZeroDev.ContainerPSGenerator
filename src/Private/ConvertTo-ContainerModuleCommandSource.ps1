@@ -103,6 +103,38 @@ function ConvertTo-ContainerModuleCommandSource {
     $lines.Add("    `$dockerArguments.Add('--rm')")
 
     foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Device') {
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        `$devicePath = [System.IO.Path]::GetFullPath([string] `$$($parameter.Name))")
+            $lines.Add("        `$dockerArguments.Add('--device')")
+            if ($mapping.Definition.Contains('Target')) {
+                $target = $mapping.Definition['Target'].Replace("'", "''")
+                $permissions = if ($mapping.Definition.Contains('Permissions')) { ':' + $mapping.Definition['Permissions'] } else { '' }
+                $lines.Add("        `$dockerArguments.Add(`$devicePath + ':$target$permissions')")
+            }
+            elseif ($mapping.Definition.Contains('Permissions')) {
+                $lines.Add("        `$dockerArguments.Add(`$devicePath + ':' + `$devicePath + ':$($mapping.Definition['Permissions'])')")
+            }
+            else {
+                $lines.Add("        `$dockerArguments.Add(`$devicePath)")
+            }
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Gpu') {
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        if (`$$($parameter.Name) -notmatch '^(all|[1-9][0-9]*|device=[A-Za-z0-9_.:-]+(?:,[A-Za-z0-9_.:-]+)*)`$') {")
+            $lines.Add("            throw [System.ArgumentException]::new('GPU selection must be all, a positive count, or a device list.', '$($parameter.Name)')")
+            $lines.Add('        }')
+            $lines.Add("        `$dockerArguments.Add('--gpus')")
+            $lines.Add("        `$dockerArguments.Add(`$$($parameter.Name))")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
         foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Mount') {
             $target = $mapping.Definition['Target'].Replace("'", "''")
             $readOnly = if ($mapping.Definition['Access'] -eq 'ReadOnly') { ',readonly' } else { '' }

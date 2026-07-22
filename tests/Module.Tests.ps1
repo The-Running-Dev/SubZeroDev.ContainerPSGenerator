@@ -777,6 +777,91 @@ Describe 'Volume and runtime-option mappings' {
     }
 }
 
+Describe 'Device and GPU mappings' {
+    It 'generates device passthrough and GPU options before the image' {
+        $specificationPath = Join-Path $TestDrive 'AcceleratorMappings.psd1'
+        $outputPath = Join-Path $TestDrive 'accelerator-output'
+        $devicePath = Join-Path $TestDrive 'render-device'
+        Set-Content -LiteralPath $devicePath -Value ''
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'AcceleratorExample'
+    ContainerImage = 'example/accelerator-tool'
+    Commands = @(@{ Name = 'Invoke-AcceleratorExample'; Parameters = @(
+        @{ Name = 'Device'; Type = 'FileInfo'; Mappings = @(
+            @{ Type = 'Device'; Target = '/dev/render'; Permissions = 'rw' }
+        ) }
+        @{ Name = 'SamePathDevice'; Type = 'FileInfo'; Mappings = @(
+            @{ Type = 'Device'; Permissions = 'r' }
+        ) }
+        @{ Name = 'Gpu'; Type = 'string'; Mappings = @(
+            @{ Type = 'Gpu' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'AcceleratorExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args); $global:LASTEXITCODE = 0 }
+        try {
+            Invoke-AcceleratorExample -Device $devicePath -SamePathDevice $devicePath -Gpu 'device=0,1'
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm', '--device', ([System.IO.Path]::GetFullPath($devicePath) + ':/dev/render:rw'),
+                '--device', ([System.IO.Path]::GetFullPath($devicePath) + ':' + [System.IO.Path]::GetFullPath($devicePath) + ':r'),
+                '--gpus', 'device=0,1', 'example/accelerator-tool'
+            )
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects an unsafe GPU selection before invoking Docker' {
+        $specificationPath = Join-Path $TestDrive 'GpuValue.psd1'
+        $outputPath = Join-Path $TestDrive 'gpu-value-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'GpuValueExample'; Commands = @(@{ Name = 'Invoke-GpuValueExample'; Parameters = @(
+    @{ Name = 'Gpu'; Type = 'string'; Mappings = @(@{ Type = 'Gpu' }) }
+) }) }
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'GpuValueExample.psd1') -Force -PassThru
+        $global:dockerWasInvoked = $false
+        function global:docker { $global:dockerWasInvoked = $true }
+        try {
+            { Invoke-GpuValueExample -Gpu '--privileged' } | Should -Throw -ExceptionType ([System.ArgumentException])
+            $global:dockerWasInvoked | Should -BeFalse
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable dockerWasInvoked -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed device and GPU mapping definitions' {
+        $invalidDeviceTypePath = Join-Path $TestDrive 'InvalidDeviceType.psd1'
+        $invalidDeviceTargetPath = Join-Path $TestDrive 'InvalidDeviceTarget.psd1'
+        $invalidPermissionsPath = Join-Path $TestDrive 'InvalidDevicePermissions.psd1'
+        $invalidGpuTypePath = Join-Path $TestDrive 'InvalidGpuType.psd1'
+        Set-Content $invalidDeviceTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Device'; Type = 'int'; Mappings = @(@{ Type = 'Device' }) }) }) }"
+        Set-Content $invalidDeviceTargetPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Device'; Type = 'string'; Mappings = @(@{ Type = 'Device'; Target = 'dev/render' }) }) }) }"
+        Set-Content $invalidPermissionsPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Device'; Type = 'string'; Mappings = @(@{ Type = 'Device'; Permissions = 'wr' }) }) }) }"
+        Set-Content $invalidGpuTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Gpu'; Type = 'int'; Mappings = @(@{ Type = 'Gpu' }) }) }) }"
+
+        { Test-ContainerModuleSpecification $invalidDeviceTypePath } | Should -Throw -ExpectedMessage "*Device*mapping*must use type 'string' or 'FileInfo'*"
+        { Test-ContainerModuleSpecification $invalidDeviceTargetPath } | Should -Throw -ExpectedMessage "*'Target'*Device mapping*absolute container path*"
+        { Test-ContainerModuleSpecification $invalidPermissionsPath } | Should -Throw -ExpectedMessage "*'Permissions'*ordered combination*"
+        { Test-ContainerModuleSpecification $invalidGpuTypePath } | Should -Throw -ExpectedMessage "*Gpu*mapping*must use type 'string'*"
+    }
+}
+
 Describe 'Parameter validation attributes' {
     It 'normalizes and renders supported native validation attributes' {
         $specificationPath = Join-Path $TestDrive 'Validations.psd1'

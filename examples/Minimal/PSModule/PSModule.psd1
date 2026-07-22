@@ -88,6 +88,22 @@
                         @{ Type = 'RuntimeOption'; Name = '--network' }
                     )
                 }
+                @{
+                    Name = 'Device'
+                    Description = 'Optional host device exposed read-write inside the container.'
+                    Type = 'FileInfo'
+                    Mappings = @(
+                        @{ Type = 'Device'; Permissions = 'rw' }
+                    )
+                }
+                @{
+                    Name = 'Gpu'
+                    Description = 'Optional GPU selection such as all, 1, or device=0.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'Gpu' }
+                    )
+                }
             )
         }
     )
