@@ -479,3 +479,57 @@ Describe 'Mount mapping validation' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Access' property for Mount mapping*must be a non-empty string*"
     }
 }
+
+Describe 'Container module object model' {
+    It 'normalizes a specification without commands to an empty collection' {
+        InModuleScope SubZeroDev.ContainerPSGenerator {
+            $model = ConvertTo-ContainerModuleModel -Specification @{}
+
+            $model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+            [object]::ReferenceEquals($null, $model.Commands) | Should -BeFalse
+            $model.Commands.Count | Should -Be 0
+        }
+    }
+
+    It 'normalizes commands, parameters, and mappings' {
+        InModuleScope SubZeroDev.ContainerPSGenerator {
+            $definition = @{
+                Commands = @(
+                    @{
+                        Id = 'command.example'
+                        Name = 'Invoke-Example'
+                        Description = 'Runs the example.'
+                        Parameters = @(
+                            @{
+                                Id = 'parameter.repository'
+                                Name = 'Repository'
+                                Type = 'DirectoryInfo'
+                                Mappings = @(
+                                    @{ Type = 'Mount'; Target = '/repository'; Access = 'ReadOnly' }
+                                )
+                            }
+                        )
+                    }
+                )
+            }
+
+            $model = ConvertTo-ContainerModuleModel -Specification $definition
+            $command = $model.Commands[0]
+            $parameter = $command.Parameters[0]
+            $mapping = $parameter.Mappings[0]
+
+            $command.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model.Command'
+            $command.Id | Should -Be 'command.example'
+            $command.Name | Should -Be 'Invoke-Example'
+            $command.Description | Should -Be 'Runs the example.'
+            $parameter.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model.Parameter'
+            $parameter.Id | Should -Be 'parameter.repository'
+            $parameter.Type | Should -Be 'DirectoryInfo'
+            $parameter.Mandatory | Should -BeFalse
+            $mapping.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model.Mapping'
+            $mapping.Type | Should -Be 'Mount'
+            $mapping.Definition.Target | Should -Be '/repository'
+            [object]::ReferenceEquals($model.Definition, $definition) | Should -BeTrue
+        }
+    }
+}
