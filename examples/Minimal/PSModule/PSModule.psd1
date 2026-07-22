@@ -1,10 +1,12 @@
 @{
+    Id = 'example.container-module'
     ModuleName = 'ExampleContainer'
     ModuleVersion = '0.1.0'
     ContainerImage = 'ghcr.io/example/example-container:latest'
 
     Commands = @(
         @{
+            Id          = 'command.invoke-example'
             Name        = 'Invoke-Example'
             Synopsis    = 'Runs the example container.'
             Description = 'Runs the example container command.'
@@ -19,6 +21,7 @@
 
             Parameters = @(
                 @{
+                    Id        = 'parameter.repository'
                     Name      = 'Repository'
                     Description = 'Repository directory mounted read-only at /repository.'
                     Type      = 'DirectoryInfo'

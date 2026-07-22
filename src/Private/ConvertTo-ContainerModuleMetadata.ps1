@@ -7,6 +7,7 @@ function ConvertTo-ContainerModuleMetadata {
 
     [ordered] @{
         SchemaVersion = 1
+        Id            = $Model.Id
         ModuleName    = $Model.ModuleName
         ModuleVersion = $Model.ModuleVersion
         ContainerImage = $Model.ContainerImage

@@ -40,6 +40,11 @@ function Assert-ContainerModuleMappings {
                         "Mapping at index $index for parameter '$($parameter['Name'])' on command '$($command['Name'])' must define a non-empty string 'Type'."
                     )
                 }
+                if ($type -notin @('Argument', 'Environment', 'Mount', 'Port', 'RuntimeOption', 'Volume', 'WorkingDirectory')) {
+                    throw [System.IO.InvalidDataException]::new(
+                        "Mapping type '$type' for parameter '$($parameter['Name'])' on command '$($command['Name'])' is not supported."
+                    )
+                }
             }
         }
     }
