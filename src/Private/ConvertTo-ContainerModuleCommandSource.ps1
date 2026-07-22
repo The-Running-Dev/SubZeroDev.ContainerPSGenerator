@@ -86,6 +86,20 @@ function ConvertTo-ContainerModuleCommandSource {
     }
 
     foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Volume') {
+            $target = $mapping.Definition['Target'].Replace("'", "''")
+            $readOnly = if ($mapping.Definition['Access'] -eq 'ReadOnly') { ',readonly' } else { '' }
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        if (`$$($parameter.Name) -notmatch '^[A-Za-z0-9][A-Za-z0-9_.-]*`$') {")
+            $lines.Add("            throw [System.ArgumentException]::new('Docker volume name contains unsupported characters.', '$($parameter.Name)')")
+            $lines.Add('        }')
+            $lines.Add("        `$dockerArguments.Add('--mount')")
+            $lines.Add("        `$dockerArguments.Add('type=volume,source=' + `$$($parameter.Name) + ',target=$target$readOnly')")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
         foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Environment') {
             $mappingName = $mapping.Definition['Name'].Replace("'", "''")
             $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
@@ -117,6 +131,23 @@ function ConvertTo-ContainerModuleCommandSource {
             $lines.Add('        }')
             $lines.Add("        `$dockerArguments.Add('--workdir')")
             $lines.Add("        `$dockerArguments.Add(`$$($parameter.Name))")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'RuntimeOption') {
+            $optionName = $mapping.Definition['Name']
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            if ($parameter.Type -eq 'switch') {
+                $lines.Add("        `$dockerArguments.Add('$optionName')")
+            }
+            else {
+                $lines.Add("        foreach (`$value in @(`$$($parameter.Name))) {")
+                $lines.Add("            `$dockerArguments.Add('$optionName')")
+                $lines.Add('            $dockerArguments.Add([string] $value)')
+                $lines.Add('        }')
+            }
             $lines.Add('    }')
         }
     }

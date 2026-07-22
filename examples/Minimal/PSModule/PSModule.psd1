@@ -60,6 +60,22 @@
                         @{ Type = 'WorkingDirectory' }
                     )
                 }
+                @{
+                    Name = 'CacheVolume'
+                    Description = 'Optional Docker volume mounted read-write at /cache.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'Volume'; Target = '/cache'; Access = 'ReadWrite' }
+                    )
+                }
+                @{
+                    Name = 'Network'
+                    Description = 'Optional Docker network name.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'RuntimeOption'; Name = '--network' }
+                    )
+                }
             )
         }
     )
