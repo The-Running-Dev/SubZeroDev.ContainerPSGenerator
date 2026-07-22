@@ -95,6 +95,32 @@ function ConvertTo-ContainerModuleCommandSource {
         }
     }
 
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'Port') {
+            $containerPort = $mapping.Definition['ContainerPort']
+            $protocol = if ($mapping.Definition.Contains('Protocol')) { $mapping.Definition['Protocol'].ToLowerInvariant() } else { 'tcp' }
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        if (`$$($parameter.Name) -lt 1 -or `$$($parameter.Name) -gt 65535) {")
+            $lines.Add("            throw [System.ArgumentOutOfRangeException]::new('$($parameter.Name)', 'Host port must be from 1 through 65535.')")
+            $lines.Add('        }')
+            $lines.Add("        `$dockerArguments.Add('--publish')")
+            $lines.Add("        `$dockerArguments.Add([string] `$$($parameter.Name) + ':$containerPort/$protocol')")
+            $lines.Add('    }')
+        }
+    }
+
+    foreach ($parameter in $Command.Parameters) {
+        foreach ($mapping in $parameter.Mappings | Where-Object Type -eq 'WorkingDirectory') {
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        if ([string]::IsNullOrWhiteSpace(`$$($parameter.Name))) {")
+            $lines.Add("            throw [System.ArgumentException]::new('Container working directory cannot be empty.', '$($parameter.Name)')")
+            $lines.Add('        }')
+            $lines.Add("        `$dockerArguments.Add('--workdir')")
+            $lines.Add("        `$dockerArguments.Add(`$$($parameter.Name))")
+            $lines.Add('    }')
+        }
+    }
+
     $lines.Add("    `$dockerArguments.Add('$($ContainerImage.Replace("'", "''"))')")
 
     foreach ($parameter in $Command.Parameters) {

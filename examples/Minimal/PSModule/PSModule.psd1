@@ -44,6 +44,22 @@
                         }
                     )
                 }
+                @{
+                    Name = 'HostPort'
+                    Description = 'Optional host port published to container port 8080.'
+                    Type = 'int'
+                    Mappings = @(
+                        @{ Type = 'Port'; ContainerPort = 8080; Protocol = 'tcp' }
+                    )
+                }
+                @{
+                    Name = 'WorkingDirectory'
+                    Description = 'Optional working directory inside the container.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'WorkingDirectory' }
+                    )
+                }
             )
         }
     )

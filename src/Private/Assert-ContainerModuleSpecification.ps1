@@ -13,4 +13,5 @@ param (
     Assert-ContainerModuleMappings -Specification $Specification
     Assert-ContainerModuleNamedMappings -Specification $Specification
     Assert-ContainerModuleMountMappings -Specification $Specification
+    Assert-ContainerModuleRuntimeMappings -Specification $Specification
 }

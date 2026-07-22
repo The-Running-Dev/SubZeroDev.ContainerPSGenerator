@@ -525,6 +525,10 @@ Generated commands place environment mappings before the image reference and arg
 
 `Mount` mappings require a non-empty string container `Target`. `Access` must be `ReadOnly` or `ReadWrite`. Generated commands resolve the supplied host path to an absolute path and emit a Docker bind mount before the image reference.
 
+`Port` mappings use an integer parameter for the host port and require a `ContainerPort` from 1 through 65535. Optional `Protocol` values are `tcp` (the default) or `udp`. Generated commands reject out-of-range host ports and emit `--publish host:container/protocol`.
+
+`WorkingDirectory` mappings use a string parameter and emit `--workdir`. A command may define at most one working-directory mapping, and bound values cannot be empty.
+
 A parameter may define multiple mappings.
 
 ---

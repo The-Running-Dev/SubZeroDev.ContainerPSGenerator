@@ -542,6 +542,94 @@ Describe 'Mount mapping validation' {
     }
 }
 
+Describe 'Port and working-directory mappings' {
+    It 'generates Docker publish and working-directory options before the image' {
+        $specificationPath = Join-Path $TestDrive 'RuntimeMappings.psd1'
+        $outputPath = Join-Path $TestDrive 'runtime-mapping-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'RuntimeMappingExample'
+    ContainerImage = 'example/runtime-tool'
+    Commands = @(@{ Name = 'Invoke-RuntimeMappingExample'; Parameters = @(
+        @{ Name = 'HostPort'; Type = 'int'; Mappings = @(
+            @{ Type = 'Port'; ContainerPort = 8080; Protocol = 'udp' }
+        ) }
+        @{ Name = 'ContainerPath'; Type = 'string'; Mappings = @(
+            @{ Type = 'WorkingDirectory' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'RuntimeMappingExample.psd1') -Force -PassThru
+        $global:capturedDockerArguments = $null
+        function global:docker { $global:capturedDockerArguments = @($args); $global:LASTEXITCODE = 0 }
+        try {
+            Invoke-RuntimeMappingExample -HostPort 9000 -ContainerPath '/workspace'
+
+            $global:capturedDockerArguments | Should -Be @(
+                'run', '--rm', '--publish', '9000:8080/udp',
+                '--workdir', '/workspace', 'example/runtime-tool'
+            )
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable capturedDockerArguments -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects invalid bound runtime values before calling Docker' {
+        $specificationPath = Join-Path $TestDrive 'RuntimeValues.psd1'
+        $outputPath = Join-Path $TestDrive 'runtime-value-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'RuntimeValueExample'
+    Commands = @(@{ Name = 'Invoke-RuntimeValueExample'; Parameters = @(
+        @{ Name = 'HostPort'; Type = 'int'; Mappings = @(
+            @{ Type = 'Port'; ContainerPort = 80 }
+        ) }
+        @{ Name = 'ContainerPath'; Type = 'string'; Mappings = @(
+            @{ Type = 'WorkingDirectory' }
+        ) }
+    ) })
+}
+'@
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'RuntimeValueExample.psd1') -Force -PassThru
+        $global:dockerWasInvoked = $false
+        function global:docker { $global:dockerWasInvoked = $true }
+        try {
+            { Invoke-RuntimeValueExample -HostPort 70000 } | Should -Throw -ExceptionType ([System.ArgumentOutOfRangeException])
+            { Invoke-RuntimeValueExample -ContainerPath ' ' } | Should -Throw -ExceptionType ([System.ArgumentException])
+            $global:dockerWasInvoked | Should -BeFalse
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Variable dockerWasInvoked -Scope Global -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'rejects malformed runtime mapping definitions' {
+        $invalidPortPath = Join-Path $TestDrive 'InvalidPort.psd1'
+        $invalidProtocolPath = Join-Path $TestDrive 'InvalidProtocol.psd1'
+        $invalidWorkdirTypePath = Join-Path $TestDrive 'InvalidWorkdirType.psd1'
+        $duplicateWorkdirPath = Join-Path $TestDrive 'DuplicateWorkdir.psd1'
+        Set-Content $invalidPortPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Port'; Type = 'int'; Mappings = @(@{ Type = 'Port'; ContainerPort = 70000 }) }) }) }"
+        Set-Content $invalidProtocolPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Port'; Type = 'int'; Mappings = @(@{ Type = 'Port'; ContainerPort = 80; Protocol = 'sctp' }) }) }) }"
+        Set-Content $invalidWorkdirTypePath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'Path'; Type = 'DirectoryInfo'; Mappings = @(@{ Type = 'WorkingDirectory' }) }) }) }"
+        Set-Content $duplicateWorkdirPath "@{ Commands = @(@{ Name = 'Invoke-Example'; Parameters = @(@{ Name = 'One'; Type = 'string'; Mappings = @(@{ Type = 'WorkingDirectory' }) }, @{ Name = 'Two'; Type = 'string'; Mappings = @(@{ Type = 'WorkingDirectory' }) }) }) }"
+
+        { Test-ContainerModuleSpecification $invalidPortPath } | Should -Throw -ExpectedMessage "*'ContainerPort'*1 through 65535*"
+        { Test-ContainerModuleSpecification $invalidProtocolPath } | Should -Throw -ExpectedMessage "*'Protocol'*'tcp' or 'udp'*"
+        { Test-ContainerModuleSpecification $invalidWorkdirTypePath } | Should -Throw -ExpectedMessage "*WorkingDirectory*must use type 'string'*"
+        { Test-ContainerModuleSpecification $duplicateWorkdirPath } | Should -Throw -ExpectedMessage '*at most one WorkingDirectory*'
+    }
+}
+
 Describe 'Parameter validation attributes' {
     It 'normalizes and renders supported native validation attributes' {
         $specificationPath = Join-Path $TestDrive 'Validations.psd1'
