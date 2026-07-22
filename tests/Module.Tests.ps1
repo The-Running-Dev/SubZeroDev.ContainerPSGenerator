@@ -65,3 +65,45 @@ Describe 'Build-ContainerModule specification loading' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a valid PowerShell data file*'
     }
 }
+
+Describe 'Container module build context' {
+    BeforeAll {
+        $specificationPath = Join-Path $TestDrive 'Specification.psd1'
+        Set-Content -LiteralPath $specificationPath -Value '@{ Commands = @(@{ Name = ''Invoke-Example'' }) }'
+    }
+
+    It 'normalizes build paths and carries the imported specification' {
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{
+            SpecificationPath = $specificationPath
+            OutputPath = Join-Path $TestDrive 'generated' '..' 'output'
+        } {
+            param ($SpecificationPath, $OutputPath)
+
+            $context = New-ContainerModuleBuildContext `
+                -SpecificationPath $SpecificationPath `
+                -OutputPath $OutputPath
+
+            $context.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.BuildContext'
+            $context.SpecificationPath | Should -Be ([System.IO.Path]::GetFullPath($SpecificationPath))
+            $context.OutputPath | Should -Be ([System.IO.Path]::GetFullPath($OutputPath))
+            $context.Specification.Commands[0].Name | Should -Be 'Invoke-Example'
+        }
+    }
+
+    It 'does not create the output directory while constructing the context' {
+        $outputPath = Join-Path $TestDrive 'not-created'
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{
+            SpecificationPath = $specificationPath
+            OutputPath = $outputPath
+        } {
+            param ($SpecificationPath, $OutputPath)
+
+            $null = New-ContainerModuleBuildContext `
+                -SpecificationPath $SpecificationPath `
+                -OutputPath $OutputPath
+
+            Test-Path -LiteralPath $OutputPath | Should -BeFalse
+        }
+    }
+}
