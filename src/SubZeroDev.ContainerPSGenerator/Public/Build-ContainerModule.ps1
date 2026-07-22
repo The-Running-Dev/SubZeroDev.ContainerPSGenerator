@@ -22,7 +22,8 @@ function Build-ContainerModule {
         [string] $Output = 'artifacts/PSModule'
     )
 
-    $null = New-ContainerModuleBuildContext -SpecificationPath $Specification -OutputPath $Output
+    $context = New-ContainerModuleBuildContext -SpecificationPath $Specification -OutputPath $Output
+    Assert-ContainerModuleCommands -Specification $context.Specification
 
     throw [System.NotImplementedException]::new(
         "Module generation is not implemented yet. Specification: '$Specification'; Output: '$Output'."
