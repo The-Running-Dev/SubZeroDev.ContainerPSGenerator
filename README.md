@@ -4,7 +4,7 @@ SubZeroDev.ContainerPSGenerator is a proposed PowerShell 7+ build tool for gener
 
 Repositories describe their public interface in a declarative PowerShell data file. During the normal repository build, the generator produces a complete, self-contained module that is embedded in the container image. Users can then install that module from the image and work with native PowerShell commands instead of assembling `docker run` invocations manually.
 
-> **Status:** Version 1 specification (working draft). The implementation is not yet available.
+> **Status:** Version 1 specification and implementation are under active development.
 
 ## Goals
 
@@ -79,6 +79,19 @@ From the repository root, import the development manifest:
 ```powershell
 Import-Module ./src/SubZeroDev.ContainerPSGenerator.psd1 -Force
 Get-Command -Module SubZeroDev.ContainerPSGenerator
+```
+
+Install a generated module embedded at `/PSModule` in a container image:
+
+```powershell
+Install-ContainerModule ghcr.io/example/example-container:latest
+```
+
+The default destination is `~/PSModule`. Preview the create/copy/remove operation or select another directory:
+
+```powershell
+Install-ContainerModule ghcr.io/example/example-container:latest -WhatIf
+Install-ContainerModule ghcr.io/example/example-container:latest -Destination ~/Modules/ExampleContainer
 ```
 
 Validate the included example specification:
