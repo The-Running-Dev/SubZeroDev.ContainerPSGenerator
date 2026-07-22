@@ -13,6 +13,7 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
 
         $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
+        $exportedCommands.Name | Should -Contain 'Install-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
 
@@ -1049,6 +1050,86 @@ Describe 'Generated command help and preview' {
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for command*"
         { Test-ContainerModuleSpecification -Specification $parameterSpecificationPath } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*'Description' property for parameter*"
+    }
+}
+
+Describe 'Install-ContainerModule' {
+    BeforeEach {
+        $global:dockerCalls = [System.Collections.Generic.List[string]]::new()
+    }
+
+    AfterEach {
+        if (Test-Path Function:\docker) {
+            Remove-Item Function:\docker -Force
+        }
+        Remove-Variable -Name dockerCalls -Scope Global -Force -ErrorAction SilentlyContinue
+    }
+
+    It 'copies the embedded module and removes the temporary container' {
+        $destination = Join-Path $TestDrive 'installed-module'
+        function global:docker {
+            $global:dockerCalls.Add(($args -join ' '))
+            $global:LASTEXITCODE = 0
+            if ($args[0] -eq 'create') { 'container-123' }
+        }
+
+        $installedDirectory = Install-ContainerModule 'example/tool:1.0' -Destination $destination
+
+        $installedDirectory.FullName | Should -Be ([System.IO.Path]::GetFullPath($destination))
+        $global:dockerCalls | Should -Be @(
+            'create example/tool:1.0'
+            "cp container-123:/PSModule/. $([System.IO.Path]::GetFullPath($destination))"
+            'rm --force container-123'
+        )
+    }
+
+    It 'removes the temporary container when copying fails' {
+        $destination = Join-Path $TestDrive 'failed-install'
+        function global:docker {
+            $global:dockerCalls.Add(($args -join ' '))
+            if ($args[0] -eq 'create') {
+                $global:LASTEXITCODE = 0
+                'container-failed-copy'
+            }
+            elseif ($args[0] -eq 'cp') {
+                $global:LASTEXITCODE = 17
+            }
+            else {
+                $global:LASTEXITCODE = 0
+            }
+        }
+
+        { Install-ContainerModule 'example/tool:1.0' -Destination $destination } |
+            Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage '*could not copy /PSModule*Exit code: 17*'
+
+        $global:dockerCalls[-1] | Should -Be 'rm --force container-failed-copy'
+    }
+
+    It 'previews installation without calling Docker or creating the destination' {
+        $destination = Join-Path $TestDrive 'preview-install'
+        function global:docker {
+            $global:dockerCalls.Add(($args -join ' '))
+            $global:LASTEXITCODE = 0
+        }
+
+        Install-ContainerModule 'example/tool:1.0' -Destination $destination -WhatIf
+
+        $global:dockerCalls | Should -BeNullOrEmpty
+        Test-Path -LiteralPath $destination | Should -BeFalse
+    }
+
+    It 'reports when Docker is unavailable' {
+        $destination = Join-Path $TestDrive 'missing-docker-install'
+        Remove-Item Function:\docker -Force -ErrorAction SilentlyContinue
+        $originalPath = $env:PATH
+        try {
+            $env:PATH = ''
+            { Install-ContainerModule 'example/tool:1.0' -Destination $destination } |
+                Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage '*Docker is required*not found on PATH*'
+        }
+        finally {
+            $env:PATH = $originalPath
+        }
     }
 }
 

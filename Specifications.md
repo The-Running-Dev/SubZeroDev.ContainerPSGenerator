@@ -296,6 +296,8 @@ Generated modules are embedded inside every compliant image at:
 
 Install-ContainerModule retrieves the module from this location.
 
+Installation creates a temporary container without starting it, copies `/PSModule` to the local destination, and removes the temporary container even when copying fails. The command supports `-WhatIf`.
+
 Local installation defaults to:
 
 ```text
