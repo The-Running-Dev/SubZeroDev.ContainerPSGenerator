@@ -14,6 +14,33 @@ function Assert-ContainerModuleRuntimeMappings {
             if (-not $parameter.Contains('Mappings')) { continue }
             foreach ($mapping in $parameter['Mappings']) {
                 switch ($mapping['Type']) {
+                    'Device' {
+                        if ($parameter['Type'] -notin @('string', 'FileInfo', 'System.IO.FileInfo')) {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Device mapping parameter '$($parameter['Name'])' on command '$($command['Name'])' must use type 'string' or 'FileInfo'."
+                            )
+                        }
+                        if ($mapping.Contains('Target')) {
+                            $target = $mapping['Target']
+                            if ($target -isnot [string] -or $target -notmatch '^/[^:,]+$') {
+                                throw [System.IO.InvalidDataException]::new(
+                                    "The 'Target' property for Device mapping on parameter '$($parameter['Name'])' must be an absolute container path without colons or commas."
+                                )
+                            }
+                        }
+                        if ($mapping.Contains('Permissions') -and $mapping['Permissions'] -notmatch '^(?=.+$)r?w?m?$') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "The 'Permissions' property for Device mapping on parameter '$($parameter['Name'])' must be an ordered combination of 'r', 'w', and 'm'."
+                            )
+                        }
+                    }
+                    'Gpu' {
+                        if ($parameter['Type'] -ne 'string') {
+                            throw [System.IO.InvalidDataException]::new(
+                                "Gpu mapping parameter '$($parameter['Name'])' on command '$($command['Name'])' must use type 'string'."
+                            )
+                        }
+                    }
                     'WorkingDirectory' {
                         $workingDirectoryCount++
                         if ($parameter['Type'] -ne 'string') {
