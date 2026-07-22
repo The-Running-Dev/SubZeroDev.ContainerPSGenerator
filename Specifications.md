@@ -451,6 +451,8 @@ Future versions may reuse them for testing and documentation generation.
 
 Mappings are first-class typed objects.
 
+The `Mappings` property is optional on a parameter. When present, it must be an array. Each mapping must be an object with a non-empty string `Type`. Rules for the properties required by each mapping type are applied separately.
+
 ```powershell
 Mappings = @(
     @{
