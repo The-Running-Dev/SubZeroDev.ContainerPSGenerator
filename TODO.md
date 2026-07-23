@@ -26,7 +26,7 @@ work queue.
   identical files without changing current behavior.
 - [x] Build and test a packaged copy of the generator module from a clean location
   instead of testing only the development module under `src/`.
-- [ ] Add maintained integration fixtures for representative script-only and
+- [x] Add maintained integration fixtures for representative script-only and
   build-agent repositories without embedding external source checkouts.
 - [ ] Expand `examples/Minimal` into a buildable, runnable container example covering
   generate, build, install, import, invoke, help, and cleanup.

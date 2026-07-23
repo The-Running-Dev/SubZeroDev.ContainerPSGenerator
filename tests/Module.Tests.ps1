@@ -2967,6 +2967,84 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
     }
 }
 
+Describe 'Maintained repository integration fixtures' {
+    BeforeAll {
+        $fixtureRoot = Join-Path $PSScriptRoot 'fixtures' 'repositories'
+        $localRepositoryScript = Join-Path $PSScriptRoot '..' 'build' 'Test-LocalRepository.ps1'
+    }
+
+    It 'initializes, packages, imports, and invokes the script-only fixture' {
+        $repositoryPath = Join-Path $TestDrive 'ScriptOnlyRepository'
+        Copy-Item -LiteralPath (Join-Path $fixtureRoot 'ScriptOnly') `
+            -Destination $repositoryPath -Recurse
+
+        $commands = @(& $localRepositoryScript -Repository $repositoryPath -ListCommands)
+        $definition = Import-PowerShellDataFile (
+            Join-Path $repositoryPath 'PSModule' 'PSModule.psd1'
+        )
+
+        try {
+            $definition.GeneratedBy | Should -Be 'SubZeroDev.ContainerPSGenerator'
+            $definition.ModuleName | Should -Be 'ScriptOnlyRepository'
+            $definition.ContainerImage | Should -Be 'ghcr.io/example/script-fixture:latest'
+            $definition.Commands.Name | Should -Be 'Invoke-WriteGreeting'
+            $definition.Commands[0].SourceKind | Should -Be 'Script'
+            $definition.Commands[0].Parameters.Name | Should -Be @('Name', 'Uppercase')
+            $commands.Name | Should -Contain 'Invoke-WriteGreeting'
+            Test-Path -LiteralPath (
+                Join-Path $repositoryPath 'artifacts' 'PSModule' 'Scripts' 'support' 'settings.json'
+            ) | Should -BeTrue
+
+            Invoke-WriteGreeting -Name 'Codex' -Uppercase | Should -Be 'HELLO, CODEX!'
+        }
+        finally {
+            Remove-Module ScriptOnlyRepository -Force -ErrorAction SilentlyContinue
+        }
+    }
+
+    It 'inspects and generates the authored build-agent fixture' {
+        $repositoryPath = Join-Path $TestDrive 'BuildAgentRepository'
+        Copy-Item -LiteralPath (Join-Path $fixtureRoot 'BuildAgent') `
+            -Destination $repositoryPath -Recurse
+        $specificationPath = Join-Path $repositoryPath 'PSModule' 'PSModule.psd1'
+
+        $inspection = Get-ContainerModuleInspection -Specification $specificationPath
+        $commands = @(& $localRepositoryScript -Repository $repositoryPath -ListCommands)
+        $generatedCommandPath = Join-Path $repositoryPath `
+            'artifacts' 'PSModule' 'Public' 'Invoke-BuildAgent.ps1'
+        $generatedCommand = Get-Content -LiteralPath $generatedCommandPath -Raw
+
+        try {
+            $inspection.Data.Dockerfiles[0].Stages[0].Image |
+                Should -Be 'mcr.microsoft.com/dotnet/sdk:8.0'
+            $inspection.Data.DotNetProjects[0].PackageReferences.Name |
+                Should -Contain 'Nuke.Common'
+            $inspection.Data.GitHubActions[0].Name | Should -Be 'Build'
+            $inspection.Data.GitHubActions[0].Jobs | Should -Be 'build'
+            $inspection.Data.Nuke.IsConfigured | Should -BeTrue
+            $inspection.Data.Nuke.ProjectPaths | Should -Be 'src/Build/Build.csproj'
+            $commands.Name | Should -Contain 'Invoke-BuildAgent'
+            (Get-Command Invoke-BuildAgent -ErrorAction Stop).ModuleName |
+                Should -Be 'BuildAgentFixture'
+            (Get-Help Invoke-BuildAgent).Synopsis |
+                Should -Be 'Runs a target in the build-agent container.'
+            $generatedCommand | Should -Match ([regex]::Escape('--target'))
+            $generatedCommand | Should -Match ([regex]::Escape('CONFIGURATION'))
+            $generatedCommand | Should -Match ([regex]::Escape('/workspace'))
+            {
+                Invoke-BuildAgent `
+                    -Repository $repositoryPath `
+                    -Target Test `
+                    -Configuration Release `
+                    -WhatIf
+            } | Should -Not -Throw
+        }
+        finally {
+            Remove-Module BuildAgentFixture -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
 Describe 'Discovered PowerShell source execution' {
     It 'invokes a discovered script with its bound parameters instead of Docker' {
         $repositoryPath = Join-Path $TestDrive 'source-repository'
