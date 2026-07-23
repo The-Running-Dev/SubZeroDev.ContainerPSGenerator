@@ -317,7 +317,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
         Get-Content -LiteralPath $tracePath | Should -Be $stages
     }
 
-    It 'runs built-in validation and model normalization through ordered plugins' {
+    It 'runs built-in validation, model normalization, and generation through ordered plugins' {
         $context = InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{
             SpecificationPath = Join-Path $TestDrive 'PSModule' 'PSModule.psd1'
             OutputPath = Join-Path $TestDrive 'generated'
@@ -333,12 +333,39 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
                 -Context $context `
                 -Path $pluginRoot `
                 -Stage Validators, ObjectModelProcessors
+            Reset-ContainerModuleOutput -Context $context
+            $null = Invoke-ContainerModulePluginPipeline `
+                -Context $context `
+                -Path $pluginRoot `
+                -Stage CodeGenerators
             $context
         }
 
-        $context.PluginExecutions.Stage | Should -Be @('Validators', 'ObjectModelProcessors')
-        $context.PluginExecutions.Plugin | Should -Be @('SpecificationValidator', 'SpecificationModelProcessor')
+        $context.PluginExecutions.Stage | Should -Be @(
+            'Validators'
+            'ObjectModelProcessors'
+            'CodeGenerators'
+            'CodeGenerators'
+            'CodeGenerators'
+            'CodeGenerators'
+            'CodeGenerators'
+        )
+        $context.PluginExecutions.Plugin | Should -Be @(
+            'SpecificationValidator'
+            'SpecificationModelProcessor'
+            'MetadataGenerator'
+            'CommandSourceGenerator'
+            'CommandDocumentationGenerator'
+            'LoaderGenerator'
+            'ManifestGenerator'
+        )
         $context.Model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+        $context.Artifacts.Metadata.FullName | Should -Be (
+            Join-Path $context.OutputPath 'Metadata' 'model.json'
+        )
+        $context.Artifacts.Manifest.FullName | Should -Be (
+            Join-Path $context.OutputPath 'PSModule.psd1'
+        )
     }
 
     It 'uses explicitly selected plugin roots' {

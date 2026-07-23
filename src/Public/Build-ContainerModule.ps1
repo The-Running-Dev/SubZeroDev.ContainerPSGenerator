@@ -64,16 +64,16 @@ function Build-ContainerModule {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage CodeGenerators
     }
 
-    $metadataArtifact = Write-ContainerModuleMetadata -Context $context
-    Write-ContainerModuleCommandSource -Context $context
-    Write-ContainerModuleCommandDocumentation -Context $context
-    Write-ContainerModuleLoader -Context $context
-    Write-ContainerModuleManifest -Context $context | Out-Null
+    if (-not $context.Artifacts.Contains('Metadata')) {
+        throw [System.InvalidOperationException]::new(
+            'The code-generator stage did not produce the metadata artifact.'
+        )
+    }
 
     if ($pluginRoots.Count -gt 0) {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage TemplateRenderers
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage PackagingProviders
     }
 
-    return $metadataArtifact
+    return $context.Artifacts['Metadata']
 }
