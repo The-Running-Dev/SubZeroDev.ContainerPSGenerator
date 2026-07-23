@@ -7,6 +7,8 @@ on:
       - main
 
 permissions:
+  actions: read
+  checks: write
   contents: read
 
 jobs:
@@ -35,11 +37,76 @@ jobs:
       - name: Run tests
         shell: pwsh
         run: |
+          $reportDirectory = './artifacts/test-results/${{ matrix.os }}'
+          New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
+
           $configuration = New-PesterConfiguration
           $configuration.Run.Path = './tests'
           $configuration.Run.Exit = $true
           $configuration.Output.Verbosity = 'Detailed'
+          $configuration.TestResult.Enabled = $true
+          $configuration.TestResult.OutputFormat = 'NUnit3'
+          $configuration.TestResult.OutputPath = Join-Path $reportDirectory 'unit-tests.xml'
+
+          if ('${{ matrix.os }}' -eq 'ubuntu-latest') {
+            $configuration.CodeCoverage.Enabled = $true
+            $configuration.CodeCoverage.Path = './src'
+            $configuration.CodeCoverage.OutputFormat = 'JaCoCo'
+            $configuration.CodeCoverage.OutputPath = Join-Path $reportDirectory 'coverage.xml'
+          }
+
           Invoke-Pester -Configuration $configuration
+
+      - name: Publish unit test report
+        if: ${{ !cancelled() && env.ACT != 'true' }}
+        uses: dorny/test-reporter@v2
+        with:
+          name: Pester (${{ matrix.os }}) unit tests
+          path: artifacts/test-results/${{ matrix.os }}/unit-tests.xml
+          reporter: dotnet-nunit
+          fail-on-empty: true
+          use-actions-summary: true
+
+      - name: Publish coverage summary
+        if: ${{ always() && matrix.os == 'ubuntu-latest' && env.ACT != 'true' }}
+        shell: pwsh
+        run: |
+          $coveragePath = './artifacts/test-results/ubuntu-latest/coverage.xml'
+          if (-not (Test-Path -LiteralPath $coveragePath -PathType Leaf)) {
+            throw "Coverage report was not found: '$coveragePath'."
+          }
+
+          [xml] $coverage = Get-Content -LiteralPath $coveragePath -Raw
+          $lineCounter = @($coverage.report.counter) |
+            Where-Object { $_.type -eq 'LINE' } |
+            Select-Object -First 1
+
+          if ($null -eq $lineCounter) {
+            throw "Coverage report '$coveragePath' does not contain a LINE counter."
+          }
+
+          $covered = [int] $lineCounter.covered
+          $missed = [int] $lineCounter.missed
+          $total = $covered + $missed
+          $percentage = if ($total -eq 0) { 0 } else { [math]::Round(($covered / $total) * 100, 2) }
+
+          @"
+          ## Pester code coverage
+
+          | Covered lines | Missed lines | Total lines | Coverage |
+          | ---: | ---: | ---: | ---: |
+          | $covered | $missed | $total | $percentage% |
+          "@ | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+
+          Write-Host "::notice title=Pester line coverage::$percentage% ($covered/$total lines)"
+
+      - name: Upload unit test and coverage reports
+        if: ${{ always() && env.ACT != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-reports-${{ matrix.os }}
+          path: artifacts/test-results/${{ matrix.os }}
+          if-no-files-found: error
 
   container-e2e:
     name: Container end-to-end
@@ -59,8 +126,32 @@ jobs:
       - name: Run container end-to-end tests
         shell: pwsh
         run: |
+          $reportDirectory = './artifacts/test-results/container-e2e'
+          New-Item -ItemType Directory -Path $reportDirectory -Force | Out-Null
+
           $configuration = New-PesterConfiguration
           $configuration.Run.Path = './tests-e2e'
           $configuration.Run.Exit = $true
           $configuration.Output.Verbosity = 'Detailed'
+          $configuration.TestResult.Enabled = $true
+          $configuration.TestResult.OutputFormat = 'NUnit3'
+          $configuration.TestResult.OutputPath = Join-Path $reportDirectory 'container-e2e.xml'
           Invoke-Pester -Configuration $configuration
+
+      - name: Publish container end-to-end test report
+        if: ${{ !cancelled() && env.ACT != 'true' }}
+        uses: dorny/test-reporter@v2
+        with:
+          name: Container end-to-end tests
+          path: artifacts/test-results/container-e2e/container-e2e.xml
+          reporter: dotnet-nunit
+          fail-on-empty: true
+          use-actions-summary: true
+
+      - name: Upload container end-to-end test report
+        if: ${{ always() && env.ACT != 'true' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: pester-reports-container-e2e
+          path: artifacts/test-results/container-e2e
+          if-no-files-found: error

@@ -1,5 +1,7 @@
 # SubZeroDev.ContainerPSGenerator
 
+[![Test](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml/badge.svg)](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml)
+
 SubZeroDev.ContainerPSGenerator is a proposed PowerShell 7+ build tool for generating repository-specific PowerShell modules for containerized applications.
 
 Repositories describe their public interface in a declarative PowerShell data file. During the normal repository build, the generator produces a complete, self-contained module that is embedded in the container image. Users can then install that module from the image and work with native PowerShell commands instead of assembling `docker run` invocations manually.
@@ -315,6 +317,12 @@ The script builds a local act runner image with PowerShell, then runs both the `
 Because `act` itself runs inside a container, its nested Docker daemon cannot access test files created inside the runner's private `/tmp` directory. The local CI path therefore validates a shared `/tmp` bind mount, while direct and hosted runs additionally verify the mounted sentinel file and content.
 
 Act uses Linux containers and cannot faithfully reproduce GitHub's hosted Windows runner. Run the direct Pester command on Windows for fast host-platform feedback; GitHub Actions remains authoritative for both the Windows and Ubuntu jobs.
+
+Each hosted workflow run publishes the Windows and Ubuntu unit results, the container
+end-to-end results, and a Linux code-coverage summary directly on the Actions run.
+The underlying NUnit and JaCoCo XML reports are also available as downloadable
+workflow artifacts. GitHub-only reporting steps are skipped when the workflow runs
+locally through `act`.
 
 ## License
 
