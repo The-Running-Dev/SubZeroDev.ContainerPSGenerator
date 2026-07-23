@@ -639,7 +639,11 @@ Describe 'Remaining repository inspector chain' {
     AfterEach { Pop-Location }
 
     It 'persists PowerShell, workflow, NUKE, schema, and OpenAPI metadata' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'root-tool.ps1') -Value @'
+param([Parameter(Mandatory)][string] $Name)
+'@
         $scripts = New-Item -Path (Join-Path $TestDrive 'scripts') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $scripts.FullName 'run-tool.ps1') -Value 'param([switch] $Force)'
         Set-Content -LiteralPath (Join-Path $scripts.FullName 'Tools.psm1') -Value @'
 class ToolOptions {}
 function Invoke-Tool { param() }
@@ -681,6 +685,17 @@ jobs:
         $powerShell.Classes | Should -Be @('ToolOptions')
         $powerShell.ParseErrors.Count | Should -Be 0
 
+        $rootCommand = $inspection.PowerShellFiles | Where-Object Path -eq 'root-tool.ps1'
+        $rootCommand.IsCommandCandidate | Should -BeTrue
+        $rootCommand.SuggestedCommandName | Should -Be 'Invoke-RootTool'
+        $rootCommand.Parameters.Name | Should -Be 'Name'
+        $rootCommand.Parameters.Mandatory | Should -BeTrue
+
+        $scriptCommand = $inspection.PowerShellFiles | Where-Object Path -eq 'scripts/run-tool.ps1'
+        $scriptCommand.IsCommandCandidate | Should -BeTrue
+        $scriptCommand.SuggestedCommandName | Should -Be 'Invoke-RunTool'
+
+        $powerShell.IsCommandCandidate | Should -BeFalse
         $inspection.GitHubActions[0].Name | Should -Be 'CI'
         $inspection.GitHubActions[0].Triggers | Should -Be @('push', 'pull_request')
         $inspection.GitHubActions[0].Jobs | Should -Be @('test')
@@ -2441,6 +2456,9 @@ Describe 'Test-LocalRepository script' {
 # Inferred Repository
 docker run --rm ghcr.io/example/inferred:latest
 '@
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'container-tool.ps1') -Value @'
+param([string] $Tag)
+'@
         Set-Content -LiteralPath (Join-Path $scriptsPath 'install-tool.ps1') -Value @'
 param([Parameter(Mandatory)][string] $Name, [switch] $Force)
 '@
@@ -2455,10 +2473,14 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         $definition = Import-PowerShellDataFile $specificationPath
         $definition.ModuleName | Should -Be 'InferredRepository'
         $definition.ContainerImage | Should -Be 'ghcr.io/example/inferred:latest'
-        $definition.Commands.Name | Should -Be @('Test-RepositoryTool', 'Invoke-InstallTool')
-        $definition.Commands[0].SourceKind | Should -Be 'ModuleFunction'
-        $definition.Commands[1].Parameters.Name | Should -Be @('Name', 'Force')
-        $definition.Commands[1].Parameters[0].Mandatory | Should -BeTrue
+        $definition.Commands.Name | Should -Be @('Invoke-ContainerTool', 'Test-RepositoryTool', 'Invoke-InstallTool')
+        $definition.Commands[0].SourceKind | Should -Be 'Script'
+        $definition.Commands[0].Parameters.Name | Should -Be 'Tag'
+        $definition.Commands[1].SourceKind | Should -Be 'ModuleFunction'
+        $definition.Commands[2].Parameters.Name | Should -Be @('Name', 'Force')
+        $definition.Commands[2].Parameters[0].Mandatory | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-ContainerTool.ps1') |
+            Should -BeTrue
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-InstallTool.ps1') |
             Should -BeTrue
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Test-RepositoryTool.ps1') |
@@ -2487,5 +2509,14 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         & $scriptPath -Repository $repositoryPath | Out-Null
 
         (Get-Content -LiteralPath $specificationPath -Raw).Trim() | Should -Be $authoredSource
+    }
+
+    It 'imports the generated module and lists commands for immediate testing' {
+        $commands = @(& $scriptPath -Repository $repositoryPath -ListCommands -Output './listed')
+
+        $commands.Name | Should -Contain 'Invoke-ExternalRepository'
+        (Get-Command Invoke-ExternalRepository -ErrorAction Stop).ModuleName | Should -Be 'PSModule'
+
+        Remove-Module PSModule -Force
     }
 }

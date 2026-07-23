@@ -81,7 +81,9 @@ function Get-ContainerModuleSpecificationCandidate {
         )
         if (@($parseErrors).Count -gt 0) { continue }
 
-        if ($file.Extension -eq '.ps1' -and $segments -contains 'scripts') {
+        $isRootScript = $segments.Count -eq 1
+        $isScriptDirectoryScript = $segments -contains 'scripts'
+        if ($file.Extension -eq '.ps1' -and ($isRootScript -or $isScriptDirectoryScript)) {
             $words = [regex]::Matches($file.BaseName, '[A-Za-z0-9]+') | ForEach-Object {
                 [char]::ToUpperInvariant($_.Value[0]) + $_.Value.Substring(1)
             }

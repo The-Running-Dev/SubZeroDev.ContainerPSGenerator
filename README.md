@@ -233,8 +233,8 @@ Point the repository harness at any local checkout:
 When the target does not contain a specification, the harness creates
 `PSModule/PSModule.psd1` from repository inspection and then returns its validated
 model. The scaffold infers repository identity, a documented GHCR image reference,
-standalone scripts beneath `scripts` directories, and explicitly exported functions
-from modules beneath `modules` directories. Review inferred commands and add runtime
+standalone `*.ps1` scripts in the repository root and beneath `scripts` directories,
+and explicitly exported functions from modules beneath `modules` directories. Review inferred commands and add runtime
 mappings before publishing. An existing specification with no commands is refreshed
 from discovery; authored command collections are always preserved. Initial creation
 or refresh also materializes the inferred commands under `artifacts/PSModule/Public`
@@ -266,6 +266,19 @@ To continue into the generation pipeline, add `-Generate`:
 ```
 
 The harness invokes the real `Build-ContainerModule` entry point. It currently returns the generated `Metadata/model.json`; additional module artifacts will appear through the same command as generation stages are added.
+
+To generate the module, import it into the current PowerShell session, and show the
+commands available for testing, run:
+
+```powershell
+./build/Test-LocalRepository.ps1 `
+    -Repository ../MyContainerRepository `
+    -ListCommands
+```
+
+The returned command objects include their names and parameter metadata. Because the
+generated module is imported globally, you can invoke a listed command immediately
+after the harness returns.
 
 ### Run the tests
 

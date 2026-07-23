@@ -18,6 +18,9 @@ Generation output path relative to Repository, or an absolute path.
 .PARAMETER Generate
 Runs Build-ContainerModule after model validation and returns the generated artifacts.
 
+.PARAMETER ListCommands
+Generates and globally imports the module, then returns its exported commands.
+
 .PARAMETER NoInitialize
 Fails when Specification is missing and prevents refreshing an empty scaffold.
 #>
@@ -34,6 +37,9 @@ param (
 
     [Parameter()]
     [switch] $Generate,
+
+    [Parameter()]
+    [switch] $ListCommands,
 
     [Parameter()]
     [switch] $NoInitialize
@@ -81,14 +87,29 @@ try {
         $specificationInitialized = $true
     }
 
-    if ($Generate -or $specificationInitialized) {
+    if ($Generate -or $ListCommands -or $specificationInitialized) {
         $artifact = Build-ContainerModule -Specification $Specification -Output $Output
-        if ($specificationInitialized -and -not $Generate) {
+        if ($specificationInitialized -and -not $Generate -and -not $ListCommands) {
             Write-Host "Generated inferred container module: $Output" -ForegroundColor Green
         }
-        if ($Generate) { $artifact }
     }
+
+    if ($ListCommands) {
+        $model = Get-ContainerModuleModel -Specification $Specification
+        $outputPath = if ([IO.Path]::IsPathRooted($Output)) {
+            $Output
+        }
+        else {
+            Join-Path $repositoryPath $Output
+        }
+        $generatedManifest = Join-Path ([IO.Path]::GetFullPath($outputPath)) "$($model.ModuleName).psd1"
+        $generatedModule = Import-Module $generatedManifest -Force -Global -PassThru -ErrorAction Stop
+        Get-Command -Module $generatedModule.Name | Sort-Object Name
+        return
+    }
+
     if ($Generate) {
+        $artifact
         return
     }
 
