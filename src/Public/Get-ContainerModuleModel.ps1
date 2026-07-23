@@ -16,9 +16,14 @@ function Get-ContainerModuleModel {
         [string] $Specification = 'PSModule/PSModule.psd1'
     )
 
-    $specificationData = Import-ContainerModuleSpecification -Path $Specification
-    Invoke-ContainerModuleSpecificationValidation `
-        -Specification $specificationData `
-        -SpecificationPath $Specification
-    ConvertTo-ContainerModuleModel -Specification $specificationData
+    $specificationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Specification)
+    $context = New-ContainerModuleBuildContext `
+        -SpecificationPath $specificationPath `
+        -OutputPath (Join-Path (Split-Path $specificationPath -Parent) '.container-module-model')
+    $builtInPluginRoot = Join-Path $PSScriptRoot '..' 'Plugins'
+
+    $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $builtInPluginRoot -Stage Validators
+    $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $builtInPluginRoot -Stage ObjectModelProcessors
+
+    return $context.Model
 }

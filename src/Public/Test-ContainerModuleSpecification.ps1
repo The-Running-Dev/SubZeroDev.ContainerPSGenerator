@@ -17,10 +17,14 @@ function Test-ContainerModuleSpecification {
         [string] $Specification = 'PSModule/PSModule.psd1'
     )
 
-    $specificationData = Import-ContainerModuleSpecification -Path $Specification
-    Invoke-ContainerModuleSpecificationValidation `
-        -Specification $specificationData `
-        -SpecificationPath $Specification
+    $specificationPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($Specification)
+    $context = New-ContainerModuleBuildContext `
+        -SpecificationPath $specificationPath `
+        -OutputPath (Join-Path (Split-Path $specificationPath -Parent) '.container-module-validation')
+    $null = Invoke-ContainerModulePluginPipeline `
+        -Context $context `
+        -Path (Join-Path $PSScriptRoot '..' 'Plugins') `
+        -Stage Validators
 
     return $true
 }

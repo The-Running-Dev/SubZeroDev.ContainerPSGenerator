@@ -46,16 +46,16 @@ function Build-ContainerModule {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage Inspectors
     }
 
-    Invoke-ContainerModuleSpecificationValidation `
-        -Specification $context.Specification `
-        -SpecificationPath $context.SpecificationPath
-    $context.Model = ConvertTo-ContainerModuleModel -Specification $context.Specification
-    $context.Model | Add-Member -MemberType NoteProperty -Name Inspection -Value $context.Inspection
-
     if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage ObjectModelProcessors
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage Validators
+        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage ObjectModelProcessors
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage RuntimeAdapters
+    }
+
+    if ($null -eq $context.Model) {
+        throw [System.InvalidOperationException]::new(
+            'The object-model processor stage did not produce a container module model.'
+        )
     }
 
     Reset-ContainerModuleOutput -Context $context
