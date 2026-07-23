@@ -18,7 +18,7 @@ function Write-ContainerModuleCommandSource {
             [string] $command.Definition['SourceKind']
         }
         else { $null }
-        $resolvedSourcePath = $null
+        $packagedSourcePath = $null
         if ($sourceKind -in @('Script', 'ModuleFunction')) {
             $declaredSourcePath = [string] $command.Definition['SourcePath']
             if ([IO.Path]::IsPathRooted($declaredSourcePath)) {
@@ -36,12 +36,28 @@ function Write-ContainerModuleCommandSource {
                     "SourcePath for command '$($command.Name)' resolves outside the repository."
                 )
             }
+            if (-not (Test-Path -LiteralPath $resolvedSourcePath -PathType Leaf)) {
+                throw [System.IO.FileNotFoundException]::new(
+                    "SourcePath for command '$($command.Name)' was not found.",
+                    $resolvedSourcePath
+                )
+            }
+
+            $packageDirectory = if ($sourceKind -eq 'Script') { 'Scripts' } else { 'Modules' }
+            $normalizedDeclaredPath = $declaredSourcePath.Replace(
+                [IO.Path]::AltDirectorySeparatorChar,
+                [IO.Path]::DirectorySeparatorChar
+            )
+            $packagedSourcePath = Join-Path $packageDirectory $normalizedDeclaredPath
+            $destinationPath = Join-Path $Context.OutputPath $packagedSourcePath
+            $null = New-Item -Path (Split-Path $destinationPath -Parent) -ItemType Directory -Force
+            Copy-Item -LiteralPath $resolvedSourcePath -Destination $destinationPath -Force
         }
         $source = ConvertTo-ContainerModuleCommandSource `
             -Command $command `
             -ContainerImage $Context.Model.ContainerImage `
             -SourceKind $sourceKind `
-            -ResolvedSourcePath $resolvedSourcePath
+            -PackagedSourcePath $packagedSourcePath
         [System.IO.File]::WriteAllText(
             $sourcePath,
             $source,

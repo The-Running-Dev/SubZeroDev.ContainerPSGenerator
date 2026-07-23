@@ -11,7 +11,7 @@ function ConvertTo-ContainerModuleCommandSource {
         [string] $SourceKind,
 
         [Parameter()]
-        [string] $ResolvedSourcePath
+        [string] $PackagedSourcePath
     )
 
     $lines = [System.Collections.Generic.List[string]]::new()
@@ -112,7 +112,7 @@ function ConvertTo-ContainerModuleCommandSource {
     }
 
     if ($SourceKind -in @('Script', 'ModuleFunction')) {
-        $escapedSourcePath = $ResolvedSourcePath.Replace("'", "''")
+        $escapedSourcePath = $PackagedSourcePath.Replace("'", "''")
         $lines.Add('')
         $lines.Add('    $sourceParameters = @{}')
         foreach ($parameter in $Command.Parameters) {
@@ -120,7 +120,8 @@ function ConvertTo-ContainerModuleCommandSource {
             $lines.Add("        `$sourceParameters['$($parameter.Name)'] = `$$($parameter.Name)")
             $lines.Add('    }')
         }
-        $lines.Add("    `$sourcePath = '$escapedSourcePath'")
+        $lines.Add('    $moduleRoot = Split-Path $PSScriptRoot -Parent')
+        $lines.Add("    `$sourcePath = Join-Path `$moduleRoot '$escapedSourcePath'")
         $lines.Add("    if (-not (Test-Path -LiteralPath `$sourcePath -PathType Leaf)) {")
         $lines.Add("        throw [System.IO.FileNotFoundException]::new('Discovered PowerShell source was not found.', `$sourcePath)")
         $lines.Add('    }')

@@ -295,11 +295,12 @@ Invoke-MyCommand -Verbose
 ```
 
 Inferred commands with `SourceKind = 'Script'` invoke their discovered `.ps1` file
-directly. Inferred `ModuleFunction` commands import the discovered `.psm1` and invoke
-the exported function module-qualified. Both retain the original repository as a
-runtime dependency, so moving or deleting it makes those generated commands invalid.
-Commands without a supported source kind remain container wrappers and require a real
-`ContainerImage` plus runtime mappings.
+from the generated module's `Scripts` directory. Inferred `ModuleFunction` commands
+import their packaged `.psm1` from the generated module's `Modules` directory and
+invoke the exported function module-qualified. Original relative paths are preserved
+beneath those directories, and generated wrappers resolve them relative to the module
+instead of embedding development-machine paths. Commands without a supported source
+kind remain container wrappers and require a real `ContainerImage` plus runtime mappings.
 
 ### Run the tests
 

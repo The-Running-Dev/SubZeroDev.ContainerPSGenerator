@@ -2582,10 +2582,21 @@ Set-Content -LiteralPath $ResultPath -Value $Value
 
         Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
         $module = Import-Module (Join-Path $outputPath 'SourceExample.psd1') -Force -PassThru
+        $generatedCommandSource = Get-Content -LiteralPath (
+            Join-Path $outputPath 'Public' 'Invoke-SourceExample.ps1'
+        ) -Raw
         function global:docker { throw 'Docker must not be called for a discovered script.' }
         try {
             $verboseOutput = Invoke-SourceExample -Value 'executed' -ResultPath $resultPath -Verbose 4>&1
 
+            Test-Path -LiteralPath (Join-Path $outputPath 'Scripts' 'run-source.ps1') |
+                Should -BeTrue
+            $generatedCommandSource | Should -Match '\$moduleRoot = Split-Path \$PSScriptRoot -Parent'
+            $expectedPackagedPath = Join-Path 'Scripts' 'run-source.ps1'
+            $generatedCommandSource | Should -Match (
+                [regex]::Escape("Join-Path `$moduleRoot '$expectedPackagedPath'")
+            )
+            $generatedCommandSource | Should -Not -Match [regex]::Escape($repositoryPath)
             Get-Content -LiteralPath $resultPath -Raw | Should -Match '^executed'
             $verboseOutput -join "`n" | Should -Match 'Invoking discovered PowerShell source'
             $verboseOutput -join "`n" | Should -Match 'PowerShell source finished after'
@@ -2632,6 +2643,9 @@ Export-ModuleMember -Function Invoke-SourceTool
         try {
             Invoke-SourceTool -Value 'module-executed' -ResultPath $resultPath
 
+            Test-Path -LiteralPath (
+                Join-Path $outputPath 'Modules' 'modules' 'SourceTools.psm1'
+            ) | Should -BeTrue
             Get-Content -LiteralPath $resultPath -Raw | Should -Match '^module-executed'
         }
         finally {
