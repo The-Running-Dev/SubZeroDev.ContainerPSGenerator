@@ -2,7 +2,7 @@
 
 [![Test](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml/badge.svg)](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml)
 
-SubZeroDev.ContainerPSGenerator is a proposed PowerShell 7+ build tool for generating repository-specific PowerShell modules for containerized applications.
+SubZeroDev.ContainerPSGenerator is a PowerShell 7.4+ build tool for generating repository-specific PowerShell modules for containerized applications.
 
 Repositories describe their public interface in a declarative PowerShell data file. During the normal repository build, the generator produces a complete, self-contained module that is embedded in the container image. Users can then install that module from the image and work with native PowerShell commands instead of assembling `docker run` invocations manually.
 
@@ -15,7 +15,7 @@ Repositories describe their public interface in a declarative PowerShell data fi
 - Use native PowerShell types, validation, help, and completion.
 - Separate build-time inspection and generation from runtime execution.
 - Support extensibility through an ordered plugin pipeline.
-- Provide a cross-platform experience on PowerShell 7+.
+- Provide a cross-platform experience on PowerShell 7.4+.
 
 ## Implemented so far
 
@@ -42,7 +42,7 @@ The current implementation supports the complete basic workflow from a repositor
 - Build, install, import, and invoke a generated module through a real Linux container in hosted and local CI.
 - Inspect repositories and ordered plugin execution diagnostics without generating build output.
 
-Still planned for Version 1 are richer user-facing diagnostics and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+The basic Version 1 workflow is implemented. Remaining work focuses on testing the packaged generator itself, stabilizing release-quality gates, hardening repository inspection, completing runnable examples, and reconciling the documentation before a release candidate. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
 See [TODO.md](TODO.md) for the complete remaining Version 1 roadmap, release-readiness work, and Phase 2 deferrals.
 
@@ -64,18 +64,19 @@ Get-Help Invoke-BuildAgent
 
 Docker is the initial container runtime. The mapping model is designed so that future runtime adapters, such as Podman, can consume the same repository specification.
 
-## Planned architecture
+## Current architecture
 
 The generator uses a plugin-oriented pipeline. Specifications reject unknown mapping and validation types, and may assign globally unique stable IDs to the root, commands, and parameters:
 
 ```text
 Repository
     -> Inspectors
-    -> Object Model
     -> Validators
+    -> Object Model Processors
+    -> Runtime Adapters
     -> Code Generators
     -> Template Renderers
-    -> Packaging
+    -> Packaging Providers
 ```
 
 Inspectors may analyze Dockerfiles, Compose files, README files, build systems, project files, configuration schemas, OpenAPI definitions, and other repository artifacts. Plugin execution is ordered by filename prefix.
@@ -88,8 +89,12 @@ See [Specifications.md](Specifications.md) for the Version 1 working draft, incl
 
 ## Requirements
 
-- PowerShell 7 or later
-- Docker
+- PowerShell 7.4 or later for inspection and generation.
+- Docker for installing embedded modules, invoking generated container commands, and
+  running the container end-to-end workflow.
+
+Windows and Linux are the supported Version 1 platforms and are validated in CI.
+macOS is best-effort for Version 1 and is not part of the required CI matrix.
 
 ## Development
 
@@ -220,11 +225,12 @@ model. The scaffold infers repository identity, a documented GHCR image referenc
 standalone `*.ps1` scripts and explicitly exported functions from `.psm1` modules
 beneath the repository's `scripts` directory. Files elsewhere in the repository are
 not inferred as commands. Review inferred commands and add runtime
-mappings before publishing. An existing specification with no commands is refreshed
-from discovery. Generated, unmapped scaffolds are refreshed on later runs so newly
-discovered scripts appear automatically; authored specifications and scaffolds with
-runtime mappings are preserved. Initial creation or refresh also materializes the
-inferred commands under `artifacts/PSModule/Public`
+mappings before publishing. Runtime intent is repository-specific, so the generator
+does not guess mappings from script names or paths. An existing specification with
+no commands is refreshed from discovery. Generated, unmapped scaffolds are refreshed
+on later runs so newly discovered scripts appear automatically; authored
+specifications and scaffolds with runtime mappings are preserved. Initial creation or
+refresh also materializes the inferred commands under `artifacts/PSModule/Public`
 while returning the validated model. Use `-NoInitialize` to retain strict behavior
 without creation or refresh.
 
@@ -252,7 +258,9 @@ To continue into the generation pipeline, add `-Generate`:
     -Generate
 ```
 
-The harness invokes the real `Build-ContainerModule` entry point. It currently returns the generated `Metadata/model.json`; additional module artifacts will appear through the same command as generation stages are added.
+The harness invokes the real `Build-ContainerModule` entry point. The command returns
+the generated `Metadata/model.json`; the complete validated module package is written
+to the selected output directory.
 
 To generate the module, import it into the current PowerShell session, and show the
 commands available for testing, run:
