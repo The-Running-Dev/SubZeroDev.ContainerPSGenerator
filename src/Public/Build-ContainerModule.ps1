@@ -28,6 +28,7 @@ function Build-ContainerModule {
     Reset-ContainerModuleOutput -Context $context
     $metadataArtifact = Write-ContainerModuleMetadata -Context $context
     Write-ContainerModuleCommandSource -Context $context
+    Write-ContainerModuleCommandDocumentation -Context $context
     Write-ContainerModuleLoader -Context $context
     Write-ContainerModuleManifest -Context $context | Out-Null
 

@@ -15,6 +15,25 @@ Repositories describe their public interface in a declarative PowerShell data fi
 - Support extensibility through an ordered plugin pipeline.
 - Provide a cross-platform experience on PowerShell 7+.
 
+## Implemented so far
+
+The current implementation supports the complete basic workflow from a repository specification to an installable generated module:
+
+- Load PowerShell data-file specifications from the conventional or an explicit path.
+- Validate module identity, container image references, commands, parameters, stable object IDs, mappings, validation rules, completion providers, help, and examples.
+- Normalize specifications into a typed object model and deterministic JSON metadata.
+- Generate importable module manifests, loaders, and public command source without a shared runtime dependency.
+- Render native `ValidateSet`, `ValidateRange`, and `ValidatePattern` parameter attributes.
+- Render static native PowerShell argument completion without restricting accepted values.
+- Generate comment-based help and deterministic Markdown command references from synopsis, descriptions, parameter help, examples, and notes.
+- Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
+- Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
+- Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
+- Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
+- Run the Pester suite on hosted Windows and Ubuntu runners.
+
+Still planned for Version 1 are the internal plugin discovery/orchestration pipeline, initial repository inspectors, richer diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+
 ## How it is intended to work
 
 1. A repository defines its module in `PSModule/PSModule.psd1`.
@@ -123,6 +142,7 @@ Generated artifacts currently include:
 artifacts/PSModule/
 ├── <ModuleName>.psd1
 ├── <ModuleName>.psm1
+├── Documentation/<CommandName>.md
 ├── Metadata/model.json
 └── Public/<CommandName>.ps1
 ```
@@ -133,7 +153,7 @@ Import the generated module through its manifest:
 Import-Module ./artifacts/PSModule/ExampleContainer.psd1 -Force
 ```
 
-The generated manifest declares the module version and exported functions, while the loader imports every public command. Public command files render supported native validation and static argument completion attributes, and translate `Mount`, `Volume`, `Device`, `Gpu`, `ResourceLimit`, `Secret`, `Environment`, `Port`, `WorkingDirectory`, `RuntimeOption`, and `Argument` parameter mappings into a `docker run --rm` invocation using the configured `ContainerImage`. They expose synopsis, descriptions, notes, parameter help, and structured examples through `Get-Help`, support `-WhatIf` previews, and report a focused error when Docker is unavailable or exits unsuccessfully.
+The generated manifest declares the module version and exported functions, while the loader imports every public command. Public command files render supported native validation and static argument completion attributes, and translate `Mount`, `Volume`, `Device`, `Gpu`, `ResourceLimit`, `Secret`, `Environment`, `Port`, `WorkingDirectory`, `RuntimeOption`, and `Argument` parameter mappings into a `docker run --rm` invocation using the configured `ContainerImage`. They expose synopsis, descriptions, notes, parameter help, and structured examples through `Get-Help`, generate matching Markdown command references, support `-WhatIf` previews, and report a focused error when Docker is unavailable or exits unsuccessfully.
 
 Preview a generated invocation without requiring or starting Docker:
 

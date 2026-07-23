@@ -473,7 +473,7 @@ Command and parameter `Description` values are rendered as comment-based help. G
 
 Commands may define `Synopsis`, `Description`, and `Notes` as non-empty strings. For compatibility, `Description` is used as the synopsis when `Synopsis` is omitted.
 
-Long-form documentation may be supplied through Markdown.
+The generator writes deterministic Markdown documentation for every command under `Documentation/`. Each page contains syntax, descriptions, parameter details, examples, and notes from the normalized model. Authored description and note content may use Markdown.
 
 ---
 
@@ -497,6 +497,8 @@ The generator renders them into:
 - Get-Help
 - Documentation
 - Tutorials
+
+Version 1 generates command reference pages. Cross-command tutorials remain part of advanced documentation generation deferred to Phase 2.
 
 Future versions may reuse them for testing and documentation generation.
 
