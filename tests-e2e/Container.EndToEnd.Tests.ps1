@@ -56,6 +56,31 @@ Describe 'Container module end-to-end workflow' {
         Get-Command Invoke-Example -Module ExampleContainer | Should -Not -BeNullOrEmpty
     }
 
+    It 'installs the generated Markdown command reference unchanged' {
+        $generatedDocumentation = Join-Path $generatedModulePath `
+            'Documentation' 'Invoke-Example.md'
+        $installedDocumentation = Join-Path $installedModulePath `
+            'Documentation' 'Invoke-Example.md'
+
+        Test-Path -LiteralPath $generatedDocumentation -PathType Leaf | Should -BeTrue
+        Test-Path -LiteralPath $installedDocumentation -PathType Leaf | Should -BeTrue
+        [Convert]::ToHexString([IO.File]::ReadAllBytes($installedDocumentation)) |
+            Should -Be ([Convert]::ToHexString([IO.File]::ReadAllBytes($generatedDocumentation)))
+
+        $markdown = Get-Content -LiteralPath $installedDocumentation -Raw
+        $markdown | Should -Match '^# Invoke-Example\n'
+        $markdown | Should -Match 'Runs the example container\.'
+        $markdown | Should -Match '## Syntax'
+        $markdown | Should -Match '### `-Repository`'
+        $markdown | Should -Match '### `-Message`'
+        $markdown | Should -Match '## Examples'
+        $markdown | Should -Match ([regex]::Escape(
+            "Invoke-Example -Repository . -Message 'hello'"
+        ))
+        $markdown | Should -Match '## Notes'
+        $markdown | Should -Match 'Docker must be available on PATH unless using -WhatIf\.'
+    }
+
     It 'runs the generated command through Docker with arguments, environment, and a mount' {
         $result = Invoke-Example `
             -Repository (Get-Item -LiteralPath $mountedRepositoryPath) `

@@ -6,7 +6,9 @@ function Get-ContainerModulePlugin {
     .DESCRIPTION
     Finds PowerShell plugin files in the supported pipeline stage directories and
     returns metadata in deterministic pipeline and lexical filename order. This
-    command inspects plugins; it does not execute their code.
+    command inspects plugins; it does not execute their code. Version 1 plugins use
+    the generator's internal shared-context contract, are trusted unsandboxed
+    PowerShell code, and do not constitute a stable public SDK.
 
     .PARAMETER Path
     One or more plugin roots containing the supported stage directories.
@@ -24,9 +26,9 @@ function Get-ContainerModulePlugin {
             'Inspectors',
             'Validators',
             'ObjectModelProcessors',
+            'RuntimeAdapters',
             'CodeGenerators',
             'TemplateRenderers',
-            'RuntimeAdapters',
             'PackagingProviders'
         )]
         [string[]] $Stage
@@ -37,9 +39,9 @@ function Get-ContainerModulePlugin {
             'Inspectors'
             'Validators'
             'ObjectModelProcessors'
+            'RuntimeAdapters'
             'CodeGenerators'
             'TemplateRenderers'
-            'RuntimeAdapters'
             'PackagingProviders'
         )
         $requestedPaths = [System.Collections.Generic.List[string]]::new()

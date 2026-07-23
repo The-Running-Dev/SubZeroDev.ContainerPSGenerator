@@ -36,6 +36,21 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
     }
+
+    It 'documents the implemented Version 1 package and inference boundaries' {
+        $buildDescription = (Get-Help Build-ContainerModule).Description.Text -join "`n"
+        $installDescription = (Get-Help Install-ContainerModule).Description.Text -join "`n"
+        $initializeDescription = (
+            Get-Help Initialize-ContainerModuleSpecification
+        ).Description.Text -join "`n"
+
+        $buildDescription | Should -Match 'Markdown reference page per command'
+        $buildDescription | Should -Match '(?s)returns.*Metadata/model\.json'
+        $installDescription | Should -Match '(?s)including.*generated Markdown documentation'
+        $installDescription | Should -Match 'WhatIf previews'
+        $initializeDescription | Should -Match '(?s)execute.*packaged scripts tree'
+        $initializeDescription | Should -Match 'inference does not guess'
+    }
 }
 
 Describe 'Packaged generator module' {
@@ -158,14 +173,27 @@ Describe 'Container module inspection diagnostics' {
 Describe 'Get-ContainerModulePlugin' {
     BeforeEach {
         $pluginRoot = Join-Path $TestDrive 'Plugins'
-        New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force | Out-Null
-        New-Item -Path (Join-Path $pluginRoot 'Validators') -ItemType Directory -Force | Out-Null
+        foreach ($stage in @(
+            'Inspectors'
+            'Validators'
+            'ObjectModelProcessors'
+            'RuntimeAdapters'
+            'CodeGenerators'
+            'TemplateRenderers'
+            'PackagingProviders'
+        )) {
+            New-Item -Path (Join-Path $pluginRoot $stage) -ItemType Directory -Force |
+                Out-Null
+        }
     }
 
     It 'returns plugins in pipeline stage and lexical filename order' {
         Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '10.ReadmeInspector.ps1') -Value '# plugin'
         Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.DockerfileInspector.ps1') -Value '# plugin'
         Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.SpecificationValidator.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'RuntimeAdapters' '00.Runtime.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'CodeGenerators' '00.Generator.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'TemplateRenderers' '00.Renderer.ps1') -Value '# plugin'
 
         $plugins = @(Get-ContainerModulePlugin -Path $pluginRoot)
 
@@ -173,8 +201,19 @@ Describe 'Get-ContainerModulePlugin' {
             '00.DockerfileInspector.ps1'
             '10.ReadmeInspector.ps1'
             '00.SpecificationValidator.ps1'
+            '00.Runtime.ps1'
+            '00.Generator.ps1'
+            '00.Renderer.ps1'
         )
-        $plugins.ExecutionOrder | Should -Be @(0, 1, 2)
+        $plugins.Stage | Should -Be @(
+            'Inspectors'
+            'Inspectors'
+            'Validators'
+            'RuntimeAdapters'
+            'CodeGenerators'
+            'TemplateRenderers'
+        )
+        $plugins.ExecutionOrder | Should -Be @(0, 1, 2, 3, 4, 5)
         $plugins[0].PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.PluginInfo'
     }
 
@@ -3087,6 +3126,7 @@ Describe 'Minimal runnable container example' {
         $runnerCommands | Should -Contain 'Import-Module'
         $runnerCommands | Should -Contain 'Invoke-Example'
         $runnerCommands | Should -Contain 'Get-Help'
+        $runnerCommands | Should -Contain 'Get-Content'
         $runnerCommands | Should -Contain 'Remove-Module'
         $runnerCommands | Should -Contain 'Remove-Item'
     }
