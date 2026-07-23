@@ -40,6 +40,8 @@ The current implementation supports the complete basic workflow from a repositor
 
 Still planned for Version 1 are richer user-facing diagnostics and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
+See [TODO.md](TODO.md) for the complete remaining Version 1 roadmap, release-readiness work, and Phase 2 deferrals.
+
 ## How it is intended to work
 
 1. A repository defines its module in `PSModule/PSModule.psd1`.
