@@ -205,6 +205,11 @@ Two representative repositories are pinned as development submodules under `test
 - `LLMs`
 - `Docker-BuildAgent`
 
+The [LLMs PowerShell module discovery specification](docs/LLMs-PowerShell-Module-Discovery-Specification.md)
+is an implementation-ready migration brief for making the LLMs repository's
+existing module exports and standalone component scripts discoverable without
+exposing setup orchestrators or container infrastructure.
+
 Clone this repository with the integration repositories included:
 
 ```powershell
