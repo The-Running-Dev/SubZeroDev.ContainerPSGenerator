@@ -13,6 +13,7 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
 
         $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
+        $exportedCommands.Name | Should -Contain 'Get-ContainerModulePlugin'
         $exportedCommands.Name | Should -Contain 'Install-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
@@ -24,6 +25,120 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Get-ContainerModulePlugin' {
+    BeforeEach {
+        $pluginRoot = Join-Path $TestDrive 'Plugins'
+        New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pluginRoot 'Validators') -ItemType Directory -Force | Out-Null
+    }
+
+    It 'returns plugins in pipeline stage and lexical filename order' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '10.ReadmeInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.DockerfileInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.SpecificationValidator.ps1') -Value '# plugin'
+
+        $plugins = @(Get-ContainerModulePlugin -Path $pluginRoot)
+
+        $plugins.FileName | Should -Be @(
+            '00.DockerfileInspector.ps1'
+            '10.ReadmeInspector.ps1'
+            '00.SpecificationValidator.ps1'
+        )
+        $plugins.ExecutionOrder | Should -Be @(0, 1, 2)
+        $plugins[0].PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.PluginInfo'
+    }
+
+    It 'can limit discovery to selected stages' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.DockerfileInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.SpecificationValidator.ps1') -Value '# plugin'
+
+        $plugin = Get-ContainerModulePlugin -Path $pluginRoot -Stage Validators
+
+        $plugin.Stage | Should -Be 'Validators'
+        $plugin.Name | Should -Be 'SpecificationValidator'
+        $plugin.Prefix | Should -Be 0
+    }
+
+    It 'rejects plugin filenames without a numeric ordering prefix' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' 'DockerfileInspector.ps1') -Value '# plugin'
+
+        { Get-ContainerModulePlugin -Path $pluginRoot } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*numeric-prefix*"
+    }
+
+    It 'rejects a missing plugin root' {
+        { Get-ContainerModulePlugin -Path (Join-Path $TestDrive 'missing') } |
+            Should -Throw -ExceptionType ([System.IO.DirectoryNotFoundException]) -ExpectedMessage '*was not found*'
+    }
+}
+
+Describe 'Container module plugin pipeline' {
+    BeforeEach {
+        $pluginRoot = Join-Path $TestDrive 'PipelinePlugins'
+        if (Test-Path -LiteralPath $pluginRoot) {
+            Remove-Item -LiteralPath $pluginRoot -Recurse -Force
+        }
+        New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pluginRoot 'Validators') -ItemType Directory -Force | Out-Null
+    }
+
+    It 'invokes plugins in stage and lexical order against a shared context' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '10.Second.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('second')
+'@
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.First.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('first')
+'@
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.Validate.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('validate')
+'@
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            $context = [pscustomobject]@{ Trace = [System.Collections.Generic.List[string]]::new() }
+
+            $result = Invoke-ContainerModulePluginPipeline -Context $context -Path $PluginRoot
+
+            [object]::ReferenceEquals($result, $context) | Should -BeTrue
+            $context.Trace | Should -Be @('first', 'second', 'validate')
+            $context.PluginExecutions.Plugin | Should -Be @('First', 'Second', 'Validate')
+            $context.PluginExecutions.Succeeded | Should -Not -Contain $false
+            $context.PluginExecutions.Duration | ForEach-Object { $_ | Should -BeOfType ([TimeSpan]) }
+        }
+    }
+
+    It 'requires plugins to declare the shared context contract' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.Invalid.ps1') -Value "'no context'"
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            { Invoke-ContainerModulePluginPipeline -Context ([pscustomobject]@{}) -Path $PluginRoot } |
+                Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*declare a 'Context' parameter*"
+        }
+    }
+
+    It 'records and identifies a failed plugin' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.Fail.ps1') -Value @'
+param ([psobject] $Context)
+throw 'inspection failed'
+'@
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            $context = [pscustomobject]@{}
+
+            { Invoke-ContainerModulePluginPipeline -Context $context -Path $PluginRoot } |
+                Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage "*Plugin 'Fail' in stage 'Inspectors' failed*"
+            $context.PluginExecutions.Count | Should -Be 1
+            $context.PluginExecutions[0].Succeeded | Should -BeFalse
+            $context.PluginExecutions[0].Error | Should -Be 'inspection failed'
+        }
     }
 }
 
@@ -60,12 +175,14 @@ Describe 'Test-ContainerModuleSpecification' {
 Describe 'Build-ContainerModule specification loading' {
     BeforeEach {
         New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'PSModule' 'Plugins') -Recurse -Force -ErrorAction SilentlyContinue
         Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
         Push-Location $TestDrive
     }
 
     AfterEach {
         Pop-Location
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'PSModule' 'Plugins') -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     It 'loads the conventional specification path by default' {
@@ -99,6 +216,51 @@ Describe 'Build-ContainerModule specification loading' {
 
         { Build-ContainerModule -Specification './Invalid.psd1' } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a valid PowerShell data file*'
+    }
+
+    It 'automatically invokes every conventional plugin stage at its build boundary' {
+        $pluginRoot = Join-Path $TestDrive 'PSModule' 'Plugins'
+        $tracePath = Join-Path $TestDrive 'plugin-trace.txt'
+        $stages = @(
+            'Inspectors'
+            'ObjectModelProcessors'
+            'Validators'
+            'RuntimeAdapters'
+            'CodeGenerators'
+            'TemplateRenderers'
+            'PackagingProviders'
+        )
+
+        foreach ($stage in $stages) {
+            $stagePath = New-Item -Path (Join-Path $pluginRoot $stage) -ItemType Directory -Force
+            Set-Content -LiteralPath (Join-Path $stagePath.FullName "00.$stage.ps1") -Value @"
+param ([psobject] `$Context)
+Add-Content -LiteralPath '$tracePath' -Value '$stage'
+"@
+        }
+
+        $null = Build-ContainerModule
+
+        Get-Content -LiteralPath $tracePath | Should -Be $stages
+    }
+
+    It 'uses explicitly selected plugin roots' {
+        $pluginRoot = Join-Path $TestDrive 'CustomPlugins'
+        $stagePath = New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force
+        $markerPath = Join-Path $TestDrive 'explicit-plugin.txt'
+        Set-Content -LiteralPath (Join-Path $stagePath.FullName '00.Explicit.ps1') -Value @"
+param ([psobject] `$Context)
+Set-Content -LiteralPath '$markerPath' -Value 'invoked'
+"@
+
+        $null = Build-ContainerModule -PluginPath $pluginRoot
+
+        Get-Content -LiteralPath $markerPath | Should -Be 'invoked'
+    }
+
+    It 'rejects an explicitly selected missing plugin root' {
+        { Build-ContainerModule -PluginPath (Join-Path $TestDrive 'MissingPlugins') } |
+            Should -Throw -ExceptionType ([System.IO.DirectoryNotFoundException]) -ExpectedMessage '*Plugin root*was not found*'
     }
 }
 

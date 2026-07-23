@@ -9,6 +9,7 @@
     FunctionsToExport = @(
         'Build-ContainerModule'
         'Get-ContainerModuleModel'
+        'Get-ContainerModulePlugin'
         'Install-ContainerModule'
         'Test-ContainerModuleSpecification'
     )
