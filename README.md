@@ -117,6 +117,18 @@ Import-Module ./src/SubZeroDev.ContainerPSGenerator.psd1 -Force
 Get-Command -Module SubZeroDev.ContainerPSGenerator
 ```
 
+Assemble and import the same clean module package exercised by CI:
+
+```powershell
+$manifest = ./build/New-GeneratorModulePackage.ps1
+Import-Module $manifest.FullName -Force
+```
+
+The default package location is
+`artifacts/module/SubZeroDev.ContainerPSGenerator`. Pass `-Output` to stage it
+elsewhere. Packaging replaces only the validated output directory and includes the
+manifest, loader, public and private functions, and built-in plugins.
+
 Inspect an ordered plugin layout without executing plugin code:
 
 ```powershell

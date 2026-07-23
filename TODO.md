@@ -24,7 +24,7 @@ work queue.
   build command.
 - [x] Add deterministic package regression tests that prove repeated builds produce
   identical files without changing current behavior.
-- [ ] Build and test a packaged copy of the generator module from a clean location
+- [x] Build and test a packaged copy of the generator module from a clean location
   instead of testing only the development module under `src/`.
 - [ ] Add maintained integration fixtures for representative script-only and
   build-agent repositories without embedding external source checkouts.
@@ -101,7 +101,7 @@ Complete these in order so every inspector follows the same policy:
   actionable execution diagnostics.
 - [x] Direct Pester, hosted Windows and Linux CI, local `act`, and the real container
   end-to-end workflow pass.
-- [ ] The generator's distributed package is tested from a clean location.
+- [x] The generator's distributed package is tested from a clean location.
 - [ ] Documentation accurately distinguishes implemented Version 1 behavior from
   Phase 2 plans.
 - [ ] Release quality gates and the clean-run release-candidate workflow pass.
