@@ -32,6 +32,7 @@ function New-ContainerModuleBuildContext {
         Inspection        = [ordered] @{}
         Model             = $null
         Artifacts         = [ordered] @{}
+        RenderRequests    = [System.Collections.Generic.List[string]]::new()
         PluginExecutions  = [System.Collections.Generic.List[object]]::new()
     }
 }

@@ -1,3 +1,3 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
-Write-ContainerModuleCommandSource -Context $Context
+$Context.RenderRequests.Add('CommandSource')

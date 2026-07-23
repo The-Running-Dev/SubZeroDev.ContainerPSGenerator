@@ -1,3 +1,3 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
-Write-ContainerModuleLoader -Context $Context
+$Context.RenderRequests.Add('Loader')
