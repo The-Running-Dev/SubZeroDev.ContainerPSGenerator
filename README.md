@@ -224,11 +224,18 @@ For an existing checkout, initialize or restore the pinned versions with:
 
 Use `git submodule update --remote` only when intentionally evaluating newer upstream commits, and commit the resulting submodule pointer changes separately. Integration work should otherwise use the pinned commits so results remain reproducible.
 
-Point the repository harness at any checkout containing `PSModule/PSModule.psd1`:
+Point the repository harness at any local checkout:
 
 ```powershell
 ./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository
 ```
+
+When the target does not contain a specification, the harness creates
+`PSModule/PSModule.psd1` from repository inspection and then returns its validated
+model. The scaffold infers repository identity, a documented GHCR image reference,
+standalone scripts beneath `scripts` directories, and explicitly exported functions
+from modules beneath `modules` directories. Review inferred commands and add runtime
+mappings before publishing. Use `-NoInitialize` to retain fail-if-missing behavior.
 
 The script imports this checkout of ContainerPSGenerator, validates the target repository's specification, and returns its normalized object model. Select non-default paths when needed:
 

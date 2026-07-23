@@ -17,6 +17,9 @@ Generation output path relative to Repository, or an absolute path.
 
 .PARAMETER Generate
 Runs Build-ContainerModule after model validation and returns the generated artifacts.
+
+.PARAMETER NoInitialize
+Fails when Specification is missing instead of creating an inferred scaffold.
 #>
 [CmdletBinding()]
 param (
@@ -30,7 +33,10 @@ param (
     [string] $Output = 'artifacts/PSModule',
 
     [Parameter()]
-    [switch] $Generate
+    [switch] $Generate,
+
+    [Parameter()]
+    [switch] $NoInitialize
 )
 
 Set-StrictMode -Version 3.0
@@ -48,6 +54,19 @@ Import-Module $manifestPath -Force -ErrorAction Stop
 
 Push-Location $repositoryPath
 try {
+    if (-not (Test-Path -LiteralPath $Specification -PathType Leaf)) {
+        if ($NoInitialize) {
+            throw [System.IO.FileNotFoundException]::new(
+                "Container module specification was not found: '$(Join-Path $repositoryPath $Specification)'."
+            )
+        }
+        Initialize-ContainerModuleSpecification `
+            -Repository $repositoryPath `
+            -Specification $Specification |
+            Out-Null
+        Write-Host "Created inferred container module specification: $Specification" -ForegroundColor Green
+    }
+
     if ($Generate) {
         Build-ContainerModule -Specification $Specification -Output $Output
         return

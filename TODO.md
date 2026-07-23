@@ -57,6 +57,12 @@ This file tracks work that remains after the built-in repository inspector chain
 - [ ] Add troubleshooting guidance for Docker, PowerShell, `act`, plugin failures, malformed repository artifacts, and installation failures.
 - [ ] Reconcile `Specifications.md`, `README.md`, command help, and generated documentation before the Version 1 release.
 
+### 5a. Repository onboarding
+
+- [x] Initialize a missing `PSModule/PSModule.psd1` from repository inspection.
+- [x] Infer module identity, documented container image, script commands, exported module functions, and parameter metadata.
+- [ ] Add runtime mappings to inferred commands after repository-specific invocation intent is known.
+
 ### 6. Release readiness
 
 - [ ] Add static analysis and formatting checks for PowerShell source.

@@ -17,6 +17,7 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
         $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModulePlugin'
         $exportedCommands.Name | Should -Contain 'Install-ContainerModule'
+        $exportedCommands.Name | Should -Contain 'Initialize-ContainerModuleSpecification'
         $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
 
@@ -2415,6 +2416,36 @@ Describe 'Test-LocalRepository script' {
         $artifact = & $scriptPath -Repository $repositoryPath -Generate -Output './generated'
 
         $artifact.FullName | Should -Be (Join-Path $repositoryPath 'generated' 'Metadata' 'model.json')
+        (Get-Location).Path | Should -Be $originalLocation.Path
+    }
+
+    It 'initializes a missing specification from repository PowerShell and documentation' {
+        $originalLocation = Get-Location
+        $repositoryPath = Join-Path $TestDrive 'InferredRepository'
+        $scriptsPath = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
+        $modulesPath = New-Item -Path (Join-Path $repositoryPath 'modules') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'README.md') -Value @'
+# Inferred Repository
+docker run --rm ghcr.io/example/inferred:latest
+'@
+        Set-Content -LiteralPath (Join-Path $scriptsPath 'install-tool.ps1') -Value @'
+param([Parameter(Mandatory)][string] $Name, [switch] $Force)
+'@
+        Set-Content -LiteralPath (Join-Path $modulesPath 'Tools.psm1') -Value @'
+function Test-RepositoryTool { param([string] $Path) }
+Export-ModuleMember -Function @('Test-RepositoryTool')
+'@
+
+        & $scriptPath -Repository $repositoryPath | Out-Null
+
+        $specificationPath = Join-Path $repositoryPath 'PSModule' 'PSModule.psd1'
+        $definition = Import-PowerShellDataFile $specificationPath
+        $definition.ModuleName | Should -Be 'InferredRepository'
+        $definition.ContainerImage | Should -Be 'ghcr.io/example/inferred:latest'
+        $definition.Commands.Name | Should -Be @('Test-RepositoryTool', 'Invoke-InstallTool')
+        $definition.Commands[0].SourceKind | Should -Be 'ModuleFunction'
+        $definition.Commands[1].Parameters.Name | Should -Be @('Name', 'Force')
+        $definition.Commands[1].Parameters[0].Mandatory | Should -BeTrue
         (Get-Location).Path | Should -Be $originalLocation.Path
     }
 }
