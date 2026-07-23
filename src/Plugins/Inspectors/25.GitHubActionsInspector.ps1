@@ -3,9 +3,9 @@ param ([Parameter(Mandatory)] [psobject] $Context)
 $workflowRoot = Join-Path $Context.RepositoryPath '.github' 'workflows'
 [object[]] $items = @()
 if (Test-Path -LiteralPath $workflowRoot -PathType Container) {
-    $items = @(Get-ChildItem -LiteralPath $workflowRoot -File | Where-Object { $_.Extension -in @('.yml','.yaml') })
+    $items = @(Get-ChildItem -LiteralPath $workflowRoot -File | Where-Object { $_.Extension -in @('.yml', '.yaml') })
 }
-[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.Name,$b.Name) }))
+[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a, $b) [StringComparer]::Ordinal.Compare($a.Name, $b.Name) }))
 
 $workflows = foreach ($item in $items) {
     $name = $null
@@ -17,7 +17,7 @@ $workflows = foreach ($item in $items) {
         if (-not $name -and $line -match '^name:\s*["'']?(?<Value>.*?)["'']?\s*$') { $name = $Matches.Value; continue }
         if ($line -match '^(?<Indent>\s*)on:\s*(?<Value>.*)$') {
             $section = 'on'; $sectionIndent = $Matches.Indent.Length
-            $value = $Matches.Value.Trim().Trim('[',']')
+            $value = $Matches.Value.Trim().Trim('[', ']')
             if ($value) { foreach ($entry in $value -split ',') { $triggers.Add($entry.Trim()) } }
             continue
         }

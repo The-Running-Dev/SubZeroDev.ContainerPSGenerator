@@ -9,13 +9,13 @@ $items = @(
         }
     }
 )
-[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
+[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a, $b) [StringComparer]::Ordinal.Compare($a.FullName, $b.FullName) }))
 
 $files = foreach ($item in $items) {
     $tokens = $null
     $errors = $null
     $ast = [Management.Automation.Language.Parser]::ParseFile($item.FullName, [ref]$tokens, [ref]$errors)
-    $relativePath = [IO.Path]::GetRelativePath($Context.RepositoryPath, $item.FullName).Replace('\','/')
+    $relativePath = [IO.Path]::GetRelativePath($Context.RepositoryPath, $item.FullName).Replace('\', '/')
     $isCommandCandidate = $item.Extension -eq '.ps1'
     $suggestedCommandName = $null
     if ($isCommandCandidate) {

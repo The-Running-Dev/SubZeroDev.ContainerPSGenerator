@@ -1857,7 +1857,7 @@ Describe 'Static argument completion' {
         $module = Import-Module (Join-Path $outputPath 'CompletionExample.psd1') -Force -PassThru
         try {
             $inputText = 'Invoke-CompletionExample -Mode B'
-            $matches = [System.Management.Automation.CommandCompletion]::CompleteInput(
+            $completionMatches = [System.Management.Automation.CommandCompletion]::CompleteInput(
                 $inputText, $inputText.Length, $null
             ).CompletionMatches.CompletionText
 
@@ -1865,7 +1865,7 @@ Describe 'Static argument completion' {
             $model.Commands[0].Parameters[0].Completions[0].Values | Should -Be @('Build', 'Benchmark')
             $metadata.Commands[0].Parameters[0].Completions[1].Values | Should -Be @('Test')
             $source | Should -Match "\[ArgumentCompletions\('Build', 'Benchmark', 'Test'\)\]"
-            $matches | Should -Be @('Build', 'Benchmark')
+            $completionMatches | Should -Be @('Build', 'Benchmark')
         }
         finally {
             Remove-Module $module -Force

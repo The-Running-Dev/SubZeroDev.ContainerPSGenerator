@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the local CI runner image failed with exit code $LASTEXITCODE."
 }
 
-foreach ($job in @('pester', 'container-e2e')) {
+foreach ($job in @('quality', 'pester', 'container-e2e')) {
     $actArguments = @(
         'pull_request'
         '--workflows', $workflowPath

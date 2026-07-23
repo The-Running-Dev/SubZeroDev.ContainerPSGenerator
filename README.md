@@ -346,6 +346,18 @@ real `ContainerImage` plus runtime mappings.
 
 ### Run the tests
 
+Run the pinned PowerShell static-analysis and formatting gate. The first invocation
+can install PSScriptAnalyzer 1.25.0 for the current user:
+
+```powershell
+./build/Invoke-Quality.ps1 -InstallDependencies
+```
+
+Later invocations can omit `-InstallDependencies`. The gate analyzes the repository's
+owned PowerShell under `src`, `build`, `examples`, `tests`, and `tests-e2e` using
+`.config/PSScriptAnalyzerSettings.psd1`; it intentionally excludes the external
+`docs-template` checkout.
+
 Run the fast test suite directly with Pester:
 
 ```powershell
