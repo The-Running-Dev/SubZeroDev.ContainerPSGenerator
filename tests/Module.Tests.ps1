@@ -318,6 +318,17 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
     }
 
     It 'runs built-in validation, model normalization, and generation through ordered plugins' {
+        Set-Content -LiteralPath (
+            Join-Path $TestDrive 'PSModule' 'PSModule.psd1'
+        ) -Value @'
+@{
+    Commands = @(
+        @{ Name = 'Invoke-First'; Parameters = @() }
+        @{ Name = 'Invoke-Second'; Parameters = @() }
+    )
+}
+'@
+
         $context = InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{
             SpecificationPath = Join-Path $TestDrive 'PSModule' 'PSModule.psd1'
             OutputPath = Join-Path $TestDrive 'generated'
@@ -332,7 +343,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             $null = Invoke-ContainerModulePluginPipeline `
                 -Context $context `
                 -Path $pluginRoot `
-                -Stage Validators, ObjectModelProcessors
+                -Stage Validators, ObjectModelProcessors, RuntimeAdapters
             Reset-ContainerModuleOutput -Context $context
             $null = Invoke-ContainerModulePluginPipeline `
                 -Context $context `
@@ -348,6 +359,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
         $context.PluginExecutions.Stage | Should -Be @(
             'Validators'
             'ObjectModelProcessors'
+            'RuntimeAdapters'
             'CodeGenerators'
             'CodeGenerators'
             'CodeGenerators'
@@ -362,6 +374,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
         $context.PluginExecutions.Plugin | Should -Be @(
             'SpecificationValidator'
             'SpecificationModelProcessor'
+            'DockerRuntimeAdapter'
             'MetadataGenerator'
             'CommandSourceGenerator'
             'CommandDocumentationGenerator'
@@ -374,6 +387,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             'ManifestRenderer'
         )
         $context.Model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+        $context.Model.Commands.RuntimeAdapter | Should -Be @('Docker', 'Docker')
         $context.RenderRequests | Should -Be @(
             'Metadata'
             'CommandSource'

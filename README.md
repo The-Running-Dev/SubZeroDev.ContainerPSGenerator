@@ -119,7 +119,7 @@ Get-ContainerModulePlugin -Path ./PSModule/Plugins
 Get-ContainerModulePlugin -Path ./PSModule/Plugins -Stage Inspectors, Validators
 ```
 
-Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `CodeGenerators`, `TemplateRenderers`, `RuntimeAdapters`, and `PackagingProviders` directories. Plugin filenames must follow the `<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`.
+Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `CodeGenerators`, `TemplateRenderers`, `RuntimeAdapters`, and `PackagingProviders` directories. Plugin filenames must follow the `<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`. The built-in Docker runtime adapter selects Docker command rendering for container-backed commands; inferred PowerShell scripts and module functions continue to execute from their packaged local sources.
 
 `Build-ContainerModule` automatically uses a `Plugins` directory beside the resolved specification. Pass `-PluginPath` to select one or more other plugin roots. The internal pipeline runner invokes each plugin with a shared `Context` parameter and records its stage, path, timing, success, and any error. The public plugin SDK remains deferred to Phase 2.
 
