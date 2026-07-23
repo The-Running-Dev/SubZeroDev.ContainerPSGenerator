@@ -20,7 +20,7 @@ This file tracks work that remains after the built-in repository inspector chain
 - [x] Move command source, loader, manifest, metadata, and documentation generation behind code-generator plugins.
 - [x] Move rendering concerns behind template-renderer plugins.
 - [x] Move Docker-specific command construction behind the built-in Docker runtime-adapter plugin.
-- [ ] Add a built-in packaging provider for the generated `/PSModule` layout.
+- [x] Add a built-in packaging provider for the generated `/PSModule` layout.
 - [ ] Keep `Build-ContainerModule` as the single public build command while making its stages orchestration-only.
 - [ ] Preserve deterministic output and current behavior throughout the refactor.
 

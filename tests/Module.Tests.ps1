@@ -353,6 +353,10 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
                 -Context $context `
                 -Path $pluginRoot `
                 -Stage TemplateRenderers
+            $null = Invoke-ContainerModulePluginPipeline `
+                -Context $context `
+                -Path $pluginRoot `
+                -Stage PackagingProviders
             $context
         }
 
@@ -370,6 +374,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             'TemplateRenderers'
             'TemplateRenderers'
             'TemplateRenderers'
+            'PackagingProviders'
         )
         $context.PluginExecutions.Plugin | Should -Be @(
             'SpecificationValidator'
@@ -385,6 +390,7 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             'CommandDocumentationRenderer'
             'LoaderRenderer'
             'ManifestRenderer'
+            'PSModulePackagingProvider'
         )
         $context.Model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
         $context.Model.Commands.RuntimeAdapter | Should -Be @('Docker', 'Docker')
@@ -401,6 +407,9 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
         $context.Artifacts.Manifest.FullName | Should -Be (
             Join-Path $context.OutputPath 'PSModule.psd1'
         )
+        $context.Artifacts.Package.FullName | Should -Be $context.OutputPath
+        $context.Artifacts.Package.PSObject.TypeNames |
+            Should -Contain 'SubZeroDev.ContainerPSGenerator.PackageArtifact'
     }
 
     It 'uses explicitly selected plugin roots' {
@@ -443,6 +452,25 @@ Set-Content -LiteralPath '$packagingMarker' -Value 'packaged'
             Build-ContainerModule -PluginPath $pluginRoot
         } | Should -Throw '*template-renderer stage did not produce the metadata artifact*'
         Test-Path -LiteralPath $packagingMarker | Should -BeFalse
+    }
+
+    It 'rejects an incomplete generated PSModule package' {
+        $pluginRoot = Join-Path $TestDrive 'IncompletePackagePlugins'
+        $rendererPath = New-Item -Path (
+            Join-Path $pluginRoot 'TemplateRenderers'
+        ) -ItemType Directory -Force
+        Set-Content -LiteralPath (
+            Join-Path $rendererPath.FullName '99.RemoveLoader.ps1'
+        ) -Value @'
+param ([psobject] $Context)
+Remove-Item -LiteralPath (
+    Join-Path $Context.OutputPath "$($Context.Model.ModuleName).psm1"
+) -Force
+'@
+
+        {
+            Build-ContainerModule -PluginPath $pluginRoot
+        } | Should -Throw "*PSModulePackagingProvider*package is incomplete*Loader*was not found*"
     }
 
     It 'rejects an explicitly selected missing plugin root' {
