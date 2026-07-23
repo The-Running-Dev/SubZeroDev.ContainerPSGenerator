@@ -2,7 +2,7 @@
 
 > **Status:** Version 1 Specification (Working Draft)  
 > **Working Title:** Container Module Generator (CMG)  
-> **Target Platform:** PowerShell 7+, Docker
+> **Target Platform:** PowerShell 7.4+, Docker
 
 ---
 
@@ -171,15 +171,17 @@ Repository
       │
 Inspectors
       │
-Object Model
-      │
 Validators
       │
-Generators
+Object Model Processors
       │
-Templates
+Runtime Adapters
       │
-Packaging
+Code Generators
+      │
+Template Renderers
+      │
+Packaging Providers
 ```
 
 PowerShell is rendered from templates using the object model.
@@ -253,6 +255,14 @@ Inspectors may analyze:
 
 New inspectors are added simply by placing them into the appropriate plugin directory.
 
+Malformed optional repository artifacts produce actionable warnings and do not stop
+inspection. Inputs explicitly identified as authoritative, including files named
+`*.schema.json`, fail inspection when malformed.
+
+Version 1 documents and tests the supported subset of Compose, GitHub Actions, and
+OpenAPI YAML. Full YAML-language support and a shared YAML dependency are not Version
+1 requirements.
+
 ---
 
 # Build Command
@@ -272,6 +282,10 @@ Debugging and diagnostics are provided through dedicated developer commands rath
 # Cross-Platform Support
 
 Generated modules execute correctly on all supported platforms.
+
+Windows and Linux are supported Version 1 platforms and are validated in CI. macOS is
+best-effort for Version 1 and is not a required CI platform. PowerShell 7.4 is the
+minimum supported version.
 
 The generator handles:
 
@@ -509,6 +523,10 @@ Future versions may reuse them for testing and documentation generation.
 Mappings are first-class typed objects.
 
 The `Mappings` property is optional on a parameter. When present, it must be an array. Each mapping must be an object with a supported, non-empty string `Type`. Unknown mapping types are rejected so that a specification cannot silently omit runtime behavior. Rules for the properties required by each mapping type are applied separately.
+
+Repository-specific runtime intent is not inferred from script names, source paths,
+or other naming conventions. Authors explicitly declare mappings whenever a command
+requires container runtime behavior.
 
 ```powershell
 Mappings = @(

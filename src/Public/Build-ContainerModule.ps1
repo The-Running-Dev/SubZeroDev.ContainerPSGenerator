@@ -42,40 +42,19 @@ function Build-ContainerModule {
         }
     }
 
-    if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage Inspectors
-    }
-
-    if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage Validators
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage ObjectModelProcessors
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage RuntimeAdapters
-    }
-
-    if ($null -eq $context.Model) {
-        throw [System.InvalidOperationException]::new(
-            'The object-model processor stage did not produce a container module model.'
-        )
-    }
-
-    Reset-ContainerModuleOutput -Context $context
-
-    if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage CodeGenerators
-    }
-
-    if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage TemplateRenderers
-    }
-
-    if (-not $context.Artifacts.Contains('Metadata')) {
-        throw [System.InvalidOperationException]::new(
-            'The template-renderer stage did not produce the metadata artifact.'
-        )
-    }
-
-    if ($pluginRoots.Count -gt 0) {
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage PackagingProviders
+    foreach ($stage in @(
+        'Inspectors'
+        'Validators'
+        'ObjectModelProcessors'
+        'RuntimeAdapters'
+        'CodeGenerators'
+        'TemplateRenderers'
+        'PackagingProviders'
+    )) {
+        Invoke-ContainerModuleBuildStage `
+            -Context $context `
+            -PluginPath $pluginRoots `
+            -Stage $stage
     }
 
     return $context.Artifacts['Metadata']

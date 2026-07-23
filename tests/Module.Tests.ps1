@@ -426,6 +426,34 @@ Set-Content -LiteralPath '$markerPath' -Value 'invoked'
         Get-Content -LiteralPath $markerPath | Should -Be 'invoked'
     }
 
+    It 'validates the object-model boundary before invoking runtime adapters' {
+        $pluginRoot = Join-Path $TestDrive 'ObjectModelBoundaryPlugins'
+        $processorPath = New-Item -Path (
+            Join-Path $pluginRoot 'ObjectModelProcessors'
+        ) -ItemType Directory -Force
+        $adapterPath = New-Item -Path (
+            Join-Path $pluginRoot 'RuntimeAdapters'
+        ) -ItemType Directory -Force
+        $adapterMarker = Join-Path $TestDrive 'runtime-adapter-ran.txt'
+        Set-Content -LiteralPath (
+            Join-Path $processorPath.FullName '99.RemoveModel.ps1'
+        ) -Value @'
+param ([psobject] $Context)
+$Context.Model = $null
+'@
+        Set-Content -LiteralPath (
+            Join-Path $adapterPath.FullName '99.WriteMarker.ps1'
+        ) -Value @"
+param ([psobject] `$Context)
+Set-Content -LiteralPath '$adapterMarker' -Value 'adapted'
+"@
+
+        {
+            Build-ContainerModule -PluginPath $pluginRoot
+        } | Should -Throw '*object-model processor stage did not produce*'
+        Test-Path -LiteralPath $adapterMarker | Should -BeFalse
+    }
+
     It 'validates rendered artifacts before invoking packaging providers' {
         $pluginRoot = Join-Path $TestDrive 'ArtifactValidationPlugins'
         $rendererPath = New-Item -Path (
