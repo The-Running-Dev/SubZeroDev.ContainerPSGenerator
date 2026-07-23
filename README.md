@@ -262,6 +262,11 @@ The script imports this checkout of ContainerPSGenerator, validates the target r
     -Output ./dist
 ```
 
+The test suite keeps representative script-only and build-agent repository fixtures
+under `tests/fixtures/repositories`. Each test copies its fixture to an isolated
+temporary directory before initialization or generation, so tests never modify the
+tracked source fixture or require neighboring repository checkouts.
+
 To continue into the generation pipeline, add `-Generate`:
 
 ```powershell
