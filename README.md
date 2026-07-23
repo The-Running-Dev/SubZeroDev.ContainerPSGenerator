@@ -200,31 +200,13 @@ Get-Help Invoke-Example -Full
 
 ### Test another local repository
 
-Two representative repositories are pinned as development submodules under `tests-integration/repositories/`:
-
-- `LLMs`
-- `Docker-BuildAgent`
-
 The [LLMs PowerShell module discovery specification](docs/LLMs-PowerShell-Module-Discovery-Specification.md)
 is an implementation-ready migration brief for making the LLMs repository's
 existing module exports and standalone component scripts discoverable without
 exposing setup orchestrators or container infrastructure.
 
-Clone this repository with the integration repositories included:
-
-```powershell
-git clone --recurse-submodules https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator.git
-```
-
-For an existing checkout, initialize or restore the pinned versions with:
-
-```powershell
-./build/Initialize-IntegrationRepositories.ps1
-```
-
-Use `git submodule update --remote` only when intentionally evaluating newer upstream commits, and commit the resulting submodule pointer changes separately. Integration work should otherwise use the pinned commits so results remain reproducible.
-
-Point the repository harness at any local checkout:
+Clone or use any repository independently, then point the repository harness at its
+local checkout. Test repositories are intentionally not embedded as Git submodules:
 
 ```powershell
 ./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository
