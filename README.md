@@ -279,12 +279,13 @@ Trace the exact Docker command, attachment behavior, elapsed time, and exit code
 Invoke-MyCommand -Verbose
 ```
 
-Inferred commands with `SourceKind = 'Script'` invoke their discovered `.ps1` file
-from the generated module's `Scripts` directory. Inferred `ModuleFunction` commands
-import their packaged `.psm1` from the generated module's `Modules` directory and
-invoke the exported function module-qualified. Paths relative to the source
-`scripts` directory are preserved beneath those generated directories, and wrappers
-resolve them relative to the module instead of embedding development-machine paths.
+The repository's complete `scripts` tree is copied once into the generated module's
+`Scripts` directory, preserving entry points, modules, sibling helpers, and supporting
+files. Inferred commands with `SourceKind = 'Script'` invoke their packaged `.ps1`
+file. Inferred `ModuleFunction` commands import their packaged `.psm1` from that same
+tree and invoke the exported function module-qualified. Paths relative to the source
+`scripts` directory are preserved, and wrappers resolve them relative to the module
+instead of embedding development-machine paths.
 Commands without a supported source kind remain container wrappers and require a
 real `ContainerImage` plus runtime mappings.
 

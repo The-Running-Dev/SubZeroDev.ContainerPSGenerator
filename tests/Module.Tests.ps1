@@ -2594,10 +2594,20 @@ Describe 'Discovered PowerShell source execution' {
         $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
         $scriptsDirectory = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
         $sourcePath = Join-Path $scriptsDirectory 'run-source.ps1'
+        $helperDirectory = New-Item -Path (Join-Path $scriptsDirectory 'modules') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $helperDirectory 'Common.ps1') -Value @'
+function Write-SourceResult {
+    param([string] $Path, [string] $Value)
+    Set-Content -LiteralPath $Path -Value $Value
+}
+'@
+        $supportDirectory = New-Item -Path (Join-Path $scriptsDirectory 'support') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $supportDirectory 'settings.json') -Value '{ "packaged": true }'
         $resultPath = Join-Path $repositoryPath 'result.txt'
         Set-Content -LiteralPath $sourcePath -Value @'
 param([Parameter(Mandatory)][string] $Value, [Parameter(Mandatory)][string] $ResultPath)
-Set-Content -LiteralPath $ResultPath -Value $Value
+. (Join-Path $PSScriptRoot 'modules/Common.ps1')
+Write-SourceResult -Path $ResultPath -Value $Value
 '@
         $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
         Set-Content -LiteralPath $specificationPath -Value @'
@@ -2627,6 +2637,12 @@ Set-Content -LiteralPath $ResultPath -Value $Value
 
             Test-Path -LiteralPath (Join-Path $outputPath 'Scripts' 'run-source.ps1') |
                 Should -BeTrue
+            Test-Path -LiteralPath (
+                Join-Path $outputPath 'Scripts' 'modules' 'Common.ps1'
+            ) | Should -BeTrue
+            Test-Path -LiteralPath (
+                Join-Path $outputPath 'Scripts' 'support' 'settings.json'
+            ) | Should -BeTrue
             $generatedCommandSource | Should -Match '\$moduleRoot = Split-Path \$PSScriptRoot -Parent'
             $expectedPackagedPath = Join-Path 'Scripts' 'run-source.ps1'
             $generatedCommandSource | Should -Match (
@@ -2680,8 +2696,9 @@ Export-ModuleMember -Function Invoke-SourceTool
             Invoke-SourceTool -Value 'module-executed' -ResultPath $resultPath
 
             Test-Path -LiteralPath (
-                Join-Path $outputPath 'Modules' 'modules' 'SourceTools.psm1'
+                Join-Path $outputPath 'Scripts' 'modules' 'SourceTools.psm1'
             ) | Should -BeTrue
+            Test-Path -LiteralPath (Join-Path $outputPath 'Modules') | Should -BeFalse
             Get-Content -LiteralPath $resultPath -Raw | Should -Match '^module-executed'
         }
         finally {

@@ -12,6 +12,21 @@ function Write-ContainerModuleCommandSource {
     $publicDirectory = Join-Path $Context.OutputPath 'Public'
     $null = New-Item -Path $publicDirectory -ItemType Directory -Force
 
+    $sourceCommands = @($Context.Model.Commands | Where-Object {
+        $_.Definition.ContainsKey('SourceKind') -and
+        $_.Definition['SourceKind'] -in @('Script', 'ModuleFunction')
+    })
+    if ($sourceCommands.Count -gt 0) {
+        $repositoryScriptsPath = Join-Path $Context.RepositoryPath 'scripts'
+        if (Test-Path -LiteralPath $repositoryScriptsPath -PathType Container) {
+            Copy-Item `
+                -LiteralPath $repositoryScriptsPath `
+                -Destination (Join-Path $Context.OutputPath 'Scripts') `
+                -Recurse `
+                -Force
+        }
+    }
+
     foreach ($command in $Context.Model.Commands) {
         $sourcePath = Join-Path $publicDirectory "$($command.Name).ps1"
         $sourceKind = if ($command.Definition.ContainsKey('SourceKind')) {
@@ -52,15 +67,11 @@ function Write-ContainerModuleCommandSource {
                 )
             }
 
-            $packageDirectory = if ($sourceKind -eq 'Script') { 'Scripts' } else { 'Modules' }
             $scriptsRelativePath = [IO.Path]::GetRelativePath(
                 (Join-Path $Context.RepositoryPath 'scripts'),
                 $resolvedSourcePath
             )
-            $packagedSourcePath = Join-Path $packageDirectory $scriptsRelativePath
-            $destinationPath = Join-Path $Context.OutputPath $packagedSourcePath
-            $null = New-Item -Path (Split-Path $destinationPath -Parent) -ItemType Directory -Force
-            Copy-Item -LiteralPath $resolvedSourcePath -Destination $destinationPath -Force
+            $packagedSourcePath = Join-Path 'Scripts' $scriptsRelativePath
         }
         $source = ConvertTo-ContainerModuleCommandSource `
             -Command $command `
