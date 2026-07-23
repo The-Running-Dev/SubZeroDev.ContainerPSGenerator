@@ -31,6 +31,7 @@ function New-ContainerModuleBuildContext {
         Specification     = $specification
         Inspection        = [ordered] @{}
         Model             = $null
+        Artifacts         = [ordered] @{}
         PluginExecutions  = [System.Collections.Generic.List[object]]::new()
     }
 }
