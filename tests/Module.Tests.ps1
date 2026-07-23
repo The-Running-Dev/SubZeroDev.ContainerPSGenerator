@@ -1,5 +1,12 @@
 BeforeAll {
-    $manifestPath = Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator.psd1'
+    $manifestPath = if (
+        -not [string]::IsNullOrWhiteSpace($env:CONTAINERPSGENERATOR_MODULE_PATH)
+    ) {
+        [IO.Path]::GetFullPath($env:CONTAINERPSGENERATOR_MODULE_PATH)
+    }
+    else {
+        Join-Path $PSScriptRoot '..' 'src' 'SubZeroDev.ContainerPSGenerator.psd1'
+    }
     Import-Module $manifestPath -Force
 }
 
@@ -28,6 +35,66 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Packaged generator module' {
+    It 'rejects repository and source directories as package output' {
+        $packagingScript = Join-Path $PSScriptRoot '..' 'build' 'New-GeneratorModulePackage.ps1'
+        $repositoryRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
+
+        foreach ($unsafePath in @($repositoryRoot, (Join-Path $repositoryRoot 'src'))) {
+            {
+                & $packagingScript -Output $unsafePath
+            } | Should -Throw "*Generator package output path is unsafe*"
+        }
+    }
+
+    It 'assembles, imports, and runs from a clean location' {
+        $packagingScript = Join-Path $PSScriptRoot '..' 'build' 'New-GeneratorModulePackage.ps1'
+        $packageRoot = Join-Path $TestDrive 'packaged-generator'
+        $null = New-Item -Path $packageRoot -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $packageRoot 'stale.txt') -Value 'stale'
+        $packagedManifest = & $packagingScript -Output $packageRoot
+
+        Test-Path -LiteralPath (Join-Path $packageRoot 'stale.txt') | Should -BeFalse
+        Test-Path -LiteralPath (Join-Path $packageRoot 'Private') -PathType Container |
+            Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $packageRoot 'Public') -PathType Container |
+            Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $packageRoot 'Plugins') -PathType Container |
+            Should -BeTrue
+
+        Remove-Module SubZeroDev.ContainerPSGenerator -Force
+        $packagedModule = Import-Module $packagedManifest.FullName -Force -PassThru -ErrorAction Stop
+        try {
+            $packagedModule.ModuleBase | Should -Be $packageRoot
+            $packagedModule.Path | Should -Be (
+                Join-Path $packageRoot 'SubZeroDev.ContainerPSGenerator.psm1'
+            )
+            $packagedModule.ExportedCommands.Keys | Should -Contain 'Build-ContainerModule'
+
+            $specificationPath = Join-Path $TestDrive 'PackagedGenerator.psd1'
+            $outputPath = Join-Path $TestDrive 'packaged-generator-output'
+            Set-Content -LiteralPath $specificationPath -Value @'
+@{ ModuleName = 'PackagedGeneratorSmoke'; Commands = @() }
+'@
+
+            $artifact = Build-ContainerModule `
+                -Specification $specificationPath `
+                -Output $outputPath
+
+            $artifact.FullName | Should -Be (
+                Join-Path $outputPath 'Metadata' 'model.json'
+            )
+            Test-ModuleManifest (
+                Join-Path $outputPath 'PackagedGeneratorSmoke.psd1'
+            ) -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        }
+        finally {
+            Remove-Module $packagedModule -Force
+            Import-Module $manifestPath -Force
+        }
     }
 }
 
