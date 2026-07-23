@@ -1,0 +1,6 @@
+[submodule "tests-integration/repositories/LLMs"]
+	path = tests-integration/repositories/LLMs
+	url = https://github.com/The-Running-Dev/LLMs.git
+[submodule "tests-integration/repositories/Docker-BuildAgent"]
+	path = tests-integration/repositories/Docker-BuildAgent
+	url = https://github.com/The-Running-Dev/Docker-BuildAgent.git

@@ -200,6 +200,25 @@ Get-Help Invoke-Example -Full
 
 ### Test another local repository
 
+Two representative repositories are pinned as development submodules under `tests-integration/repositories/`:
+
+- `LLMs`
+- `Docker-BuildAgent`
+
+Clone this repository with the integration repositories included:
+
+```powershell
+git clone --recurse-submodules https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator.git
+```
+
+For an existing checkout, initialize or restore the pinned versions with:
+
+```powershell
+./build/Initialize-IntegrationRepositories.ps1
+```
+
+Use `git submodule update --remote` only when intentionally evaluating newer upstream commits, and commit the resulting submodule pointer changes separately. Integration work should otherwise use the pinned commits so results remain reproducible.
+
 Point the repository harness at any checkout containing `PSModule/PSModule.psd1`:
 
 ```powershell
