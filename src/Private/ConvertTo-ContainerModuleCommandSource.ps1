@@ -5,7 +5,13 @@ function ConvertTo-ContainerModuleCommandSource {
         [psobject] $Command,
 
         [Parameter(Mandatory)]
-        [string] $ContainerImage
+        [string] $ContainerImage,
+
+        [Parameter()]
+        [string] $SourceKind,
+
+        [Parameter()]
+        [string] $ResolvedSourcePath
     )
 
     $lines = [System.Collections.Generic.List[string]]::new()
@@ -103,6 +109,41 @@ function ConvertTo-ContainerModuleCommandSource {
             $lines.Add("        [$parameterType] `$$($parameter.Name)$separator")
         }
         $lines.Add('    )')
+    }
+
+    if ($SourceKind -in @('Script', 'ModuleFunction')) {
+        $escapedSourcePath = $ResolvedSourcePath.Replace("'", "''")
+        $lines.Add('')
+        $lines.Add('    $sourceParameters = @{}')
+        foreach ($parameter in $Command.Parameters) {
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        `$sourceParameters['$($parameter.Name)'] = `$$($parameter.Name)")
+            $lines.Add('    }')
+        }
+        $lines.Add("    `$sourcePath = '$escapedSourcePath'")
+        $lines.Add("    if (-not (Test-Path -LiteralPath `$sourcePath -PathType Leaf)) {")
+        $lines.Add("        throw [System.IO.FileNotFoundException]::new('Discovered PowerShell source was not found.', `$sourcePath)")
+        $lines.Add('    }')
+        $lines.Add('')
+        $lines.Add("    if (-not `$PSCmdlet.ShouldProcess(`$sourcePath, 'Invoke discovered PowerShell $SourceKind')) {")
+        $lines.Add('        return')
+        $lines.Add('    }')
+        $lines.Add('')
+        $lines.Add("    Write-Verbose `"Invoking discovered PowerShell source: `$sourcePath`"")
+        $lines.Add('    $sourceStopwatch = [System.Diagnostics.Stopwatch]::StartNew()')
+        if ($SourceKind -eq 'Script') {
+            $lines.Add('    & $sourcePath @sourceParameters')
+        }
+        else {
+            $escapedCommandName = $Command.Name.Replace("'", "''")
+            $lines.Add('    $sourceModule = Import-Module $sourcePath -Force -PassThru -ErrorAction Stop')
+            $lines.Add("    `$sourceCommand = Get-Command -Module `$sourceModule.Name -Name '$escapedCommandName' -ErrorAction Stop")
+            $lines.Add('    & $sourceCommand @sourceParameters')
+        }
+        $lines.Add('    $sourceStopwatch.Stop()')
+        $lines.Add('    Write-Verbose ("PowerShell source finished after {0:N2}s." -f $sourceStopwatch.Elapsed.TotalSeconds)')
+        $lines.Add('}')
+        return ($lines -join "`n") + "`n"
     }
 
     $lines.Add('')

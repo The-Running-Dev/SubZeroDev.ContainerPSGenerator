@@ -132,6 +132,7 @@ try {
         $generatedModule = Import-Module $generatedManifest -Force -Global -PassThru -ErrorAction Stop
         $unmappedSourceCommands = @($model.Commands | Where-Object {
             $_.Definition.ContainsKey('SourcePath') -and
+            $_.Definition['SourceKind'] -notin @('Script', 'ModuleFunction') -and
             @($_.Parameters | Where-Object { $_.Mappings.Count -gt 0 }).Count -eq 0
         })
         if ($unmappedSourceCommands.Count -gt 0) {

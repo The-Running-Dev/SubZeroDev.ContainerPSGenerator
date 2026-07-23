@@ -2552,3 +2552,92 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         Remove-Module PSModule -Force
     }
 }
+
+Describe 'Discovered PowerShell source execution' {
+    It 'invokes a discovered script with its bound parameters instead of Docker' {
+        $repositoryPath = Join-Path $TestDrive 'source-repository'
+        $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
+        $sourcePath = Join-Path $repositoryPath 'run-source.ps1'
+        $resultPath = Join-Path $repositoryPath 'result.txt'
+        Set-Content -LiteralPath $sourcePath -Value @'
+param([Parameter(Mandatory)][string] $Value, [Parameter(Mandatory)][string] $ResultPath)
+Set-Content -LiteralPath $ResultPath -Value $Value
+'@
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'SourceExample'
+    Commands = @(@{
+        Name = 'Invoke-SourceExample'
+        SourceKind = 'Script'
+        SourcePath = 'run-source.ps1'
+        Parameters = @(
+            @{ Name = 'Value'; Type = 'string'; Mandatory = $true }
+            @{ Name = 'ResultPath'; Type = 'string'; Mandatory = $true }
+        )
+    })
+}
+'@
+        $outputPath = Join-Path $repositoryPath 'artifacts'
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'SourceExample.psd1') -Force -PassThru
+        function global:docker { throw 'Docker must not be called for a discovered script.' }
+        try {
+            $verboseOutput = Invoke-SourceExample -Value 'executed' -ResultPath $resultPath -Verbose 4>&1
+
+            Get-Content -LiteralPath $resultPath -Raw | Should -Match '^executed'
+            $verboseOutput -join "`n" | Should -Match 'Invoking discovered PowerShell source'
+            $verboseOutput -join "`n" | Should -Match 'PowerShell source finished after'
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Module $module -Force
+        }
+    }
+
+    It 'invokes a discovered exported module function module-qualified instead of Docker' {
+        $repositoryPath = Join-Path $TestDrive 'module-source-repository'
+        $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
+        $modulesDirectory = New-Item -Path (Join-Path $repositoryPath 'modules') -ItemType Directory -Force
+        $sourcePath = Join-Path $modulesDirectory 'SourceTools.psm1'
+        $resultPath = Join-Path $repositoryPath 'module-result.txt'
+        Set-Content -LiteralPath $sourcePath -Value @'
+function Invoke-SourceTool {
+    param([Parameter(Mandatory)][string] $Value, [Parameter(Mandatory)][string] $ResultPath)
+    Set-Content -LiteralPath $ResultPath -Value $Value
+}
+Export-ModuleMember -Function Invoke-SourceTool
+'@
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'ModuleSourceExample'
+    Commands = @(@{
+        Name = 'Invoke-SourceTool'
+        SourceKind = 'ModuleFunction'
+        SourcePath = 'modules/SourceTools.psm1'
+        Parameters = @(
+            @{ Name = 'Value'; Type = 'string'; Mandatory = $true }
+            @{ Name = 'ResultPath'; Type = 'string'; Mandatory = $true }
+        )
+    })
+}
+'@
+        $outputPath = Join-Path $repositoryPath 'artifacts'
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $module = Import-Module (Join-Path $outputPath 'ModuleSourceExample.psd1') -Force -PassThru
+        function global:docker { throw 'Docker must not be called for a discovered module function.' }
+        try {
+            Invoke-SourceTool -Value 'module-executed' -ResultPath $resultPath
+
+            Get-Content -LiteralPath $resultPath -Raw | Should -Match '^module-executed'
+        }
+        finally {
+            Remove-Item Function:\docker -Force
+            Remove-Module $module -Force
+            Remove-Module SourceTools -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
