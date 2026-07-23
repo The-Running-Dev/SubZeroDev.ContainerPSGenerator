@@ -175,12 +175,14 @@ Describe 'Test-ContainerModuleSpecification' {
 Describe 'Build-ContainerModule specification loading' {
     BeforeEach {
         New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'PSModule' 'Plugins') -Recurse -Force -ErrorAction SilentlyContinue
         Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
         Push-Location $TestDrive
     }
 
     AfterEach {
         Pop-Location
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'PSModule' 'Plugins') -Recurse -Force -ErrorAction SilentlyContinue
     }
 
     It 'loads the conventional specification path by default' {
@@ -214,6 +216,51 @@ Describe 'Build-ContainerModule specification loading' {
 
         { Build-ContainerModule -Specification './Invalid.psd1' } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage '*is not a valid PowerShell data file*'
+    }
+
+    It 'automatically invokes every conventional plugin stage at its build boundary' {
+        $pluginRoot = Join-Path $TestDrive 'PSModule' 'Plugins'
+        $tracePath = Join-Path $TestDrive 'plugin-trace.txt'
+        $stages = @(
+            'Inspectors'
+            'ObjectModelProcessors'
+            'Validators'
+            'RuntimeAdapters'
+            'CodeGenerators'
+            'TemplateRenderers'
+            'PackagingProviders'
+        )
+
+        foreach ($stage in $stages) {
+            $stagePath = New-Item -Path (Join-Path $pluginRoot $stage) -ItemType Directory -Force
+            Set-Content -LiteralPath (Join-Path $stagePath.FullName "00.$stage.ps1") -Value @"
+param ([psobject] `$Context)
+Add-Content -LiteralPath '$tracePath' -Value '$stage'
+"@
+        }
+
+        $null = Build-ContainerModule
+
+        Get-Content -LiteralPath $tracePath | Should -Be $stages
+    }
+
+    It 'uses explicitly selected plugin roots' {
+        $pluginRoot = Join-Path $TestDrive 'CustomPlugins'
+        $stagePath = New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force
+        $markerPath = Join-Path $TestDrive 'explicit-plugin.txt'
+        Set-Content -LiteralPath (Join-Path $stagePath.FullName '00.Explicit.ps1') -Value @"
+param ([psobject] `$Context)
+Set-Content -LiteralPath '$markerPath' -Value 'invoked'
+"@
+
+        $null = Build-ContainerModule -PluginPath $pluginRoot
+
+        Get-Content -LiteralPath $markerPath | Should -Be 'invoked'
+    }
+
+    It 'rejects an explicitly selected missing plugin root' {
+        { Build-ContainerModule -PluginPath (Join-Path $TestDrive 'MissingPlugins') } |
+            Should -Throw -ExceptionType ([System.IO.DirectoryNotFoundException]) -ExpectedMessage '*Plugin root*was not found*'
     }
 }
 
