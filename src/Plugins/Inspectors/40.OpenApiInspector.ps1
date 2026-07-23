@@ -5,7 +5,7 @@ $items = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File | W
     $_.Name -match $names -and
     (Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName)
 })
-[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
+[Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a, $b) [StringComparer]::Ordinal.Compare($a.FullName, $b.FullName) }))
 
 $documents = foreach ($item in $items) {
     $version = $null; $title = $null; $apiVersion = $null; $paths = @()
@@ -17,7 +17,8 @@ $documents = foreach ($item in $items) {
             if ($data.info.PSObject.Properties['version']) { $apiVersion = $data.info.version }
         }
         if ($data.PSObject.Properties['paths']) { $paths = @($data.paths.PSObject.Properties.Name) }
-    } else {
+    }
+    else {
         $section = $null; $sectionIndent = -1; $inInfo = $false
         foreach ($line in Get-Content -LiteralPath $item.FullName) {
             if ($line -match '^\s*(?:openapi|swagger):\s*["'']?(?<Value>[^"''#]+)') { $version = $Matches.Value.Trim(); continue }
@@ -30,6 +31,6 @@ $documents = foreach ($item in $items) {
         }
     }
     [Array]::Sort($paths, [StringComparer]::Ordinal)
-    [ordered]@{ Path = [IO.Path]::GetRelativePath($Context.RepositoryPath,$item.FullName).Replace('\','/'); SpecificationVersion = $version; Title = $title; ApiVersion = $apiVersion; Paths = $paths }
+    [ordered]@{ Path = [IO.Path]::GetRelativePath($Context.RepositoryPath, $item.FullName).Replace('\', '/'); SpecificationVersion = $version; Title = $title; ApiVersion = $apiVersion; Paths = $paths }
 }
 $Context.Inspection['OpenApiDocuments'] = @($documents)

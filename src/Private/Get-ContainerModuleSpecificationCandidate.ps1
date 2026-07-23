@@ -72,7 +72,6 @@ function Get-ContainerModuleSpecificationCandidate {
         if (TestNestedRepository -Path $file.FullName) { continue }
 
         $relativePath = [IO.Path]::GetRelativePath($RepositoryPath, $file.FullName).Replace('\', '/')
-        $segments = $relativePath.Split('/')
         $tokens = $null
         $parseErrors = $null
         $ast = [Management.Automation.Language.Parser]::ParseFile(

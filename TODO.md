@@ -38,7 +38,7 @@ work queue.
 
 ## 2. Release quality gates
 
-- [ ] Add PowerShell static analysis and formatting checks.
+- [x] Add PowerShell static analysis and formatting checks.
 - [ ] Measure the packaged-generator coverage baseline, define a minimum acceptable
   threshold, and enforce it in CI.
 - [ ] Raise generator and generated-module manifests to PowerShell 7.4 and validate
