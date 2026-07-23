@@ -28,6 +28,7 @@ The current implementation supports the complete basic workflow from a repositor
 - Generate comment-based help and deterministic Markdown command references from synopsis, descriptions, parameter help, examples, and notes.
 - Automatically discover pipeline plugins beside a specification, invoke all seven stages at defined build boundaries, and retain per-plugin execution diagnostics.
 - Inspect root-level Dockerfile variants and persist ordered build-stage image, alias, and platform metadata.
+- Inspect root-level Docker Compose files and persist ordered service image, build context, Dockerfile, and port metadata.
 - Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
 - Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
