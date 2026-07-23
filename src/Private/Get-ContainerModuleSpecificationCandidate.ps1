@@ -22,15 +22,13 @@ function Get-ContainerModuleSpecificationCandidate {
         if ($imageMatch.Success) { $containerImage = $imageMatch.Groups['Image'].Value }
     }
 
-    $excludedDirectories = @('.git', 'node_modules', 'artifacts', 'bin', 'obj')
-    $powerShellFiles = @(Get-ChildItem -LiteralPath $RepositoryPath -Recurse -File |
-        Where-Object {
-            $_.Extension -in @('.ps1', '.psm1') -and
-            -not (@($_.FullName.Substring($RepositoryPath.Length).Split(
-                [IO.Path]::DirectorySeparatorChar,
-                [StringSplitOptions]::RemoveEmptyEntries
-            )) | Where-Object { $_ -in $excludedDirectories })
-        })
+    $scriptsPath = Join-Path $RepositoryPath 'scripts'
+    $powerShellFiles = @(
+        if (Test-Path -LiteralPath $scriptsPath -PathType Container) {
+            Get-ChildItem -LiteralPath $scriptsPath -Recurse -File |
+                Where-Object { $_.Extension -in @('.ps1', '.psm1') }
+        }
+    )
 
     function TestNestedRepository {
         param ([string] $Path)
@@ -81,9 +79,7 @@ function Get-ContainerModuleSpecificationCandidate {
         )
         if (@($parseErrors).Count -gt 0) { continue }
 
-        $isRootScript = $segments.Count -eq 1
-        $isScriptDirectoryScript = $segments -contains 'scripts'
-        if ($file.Extension -eq '.ps1' -and ($isRootScript -or $isScriptDirectoryScript)) {
+        if ($file.Extension -eq '.ps1') {
             $words = [regex]::Matches($file.BaseName, '[A-Za-z0-9]+') | ForEach-Object {
                 [char]::ToUpperInvariant($_.Value[0]) + $_.Value.Substring(1)
             }
@@ -102,7 +98,7 @@ function Get-ContainerModuleSpecificationCandidate {
             continue
         }
 
-        if ($file.Extension -ne '.psm1' -or $segments -notcontains 'modules') { continue }
+        if ($file.Extension -ne '.psm1') { continue }
         $definedFunctionNames = @(
             $ast.FindAll({
                 param ($node)

@@ -1,9 +1,14 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
-$items = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File | Where-Object {
-    $_.Extension -in @('.ps1', '.psm1', '.psd1') -and
-    (Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName)
-})
+$scriptsPath = Join-Path $Context.RepositoryPath 'scripts'
+$items = @(
+    if (Test-Path -LiteralPath $scriptsPath -PathType Container) {
+        Get-ChildItem -LiteralPath $scriptsPath -Recurse -File | Where-Object {
+            $_.Extension -in @('.ps1', '.psm1', '.psd1') -and
+            (Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName)
+        }
+    }
+)
 [Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
 
 $files = foreach ($item in $items) {
@@ -11,11 +16,7 @@ $files = foreach ($item in $items) {
     $errors = $null
     $ast = [Management.Automation.Language.Parser]::ParseFile($item.FullName, [ref]$tokens, [ref]$errors)
     $relativePath = [IO.Path]::GetRelativePath($Context.RepositoryPath, $item.FullName).Replace('\','/')
-    $segments = $relativePath.Split('/')
-    $isCommandCandidate = (
-        $item.Extension -eq '.ps1' -and
-        ($segments.Count -eq 1 -or $segments -contains 'scripts')
-    )
+    $isCommandCandidate = $item.Extension -eq '.ps1'
     $suggestedCommandName = $null
     if ($isCommandCandidate) {
         $words = [regex]::Matches($item.BaseName, '[A-Za-z0-9]+') | ForEach-Object {

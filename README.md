@@ -217,8 +217,9 @@ local checkout. Test repositories are intentionally not embedded as Git submodul
 When the target does not contain a specification, the harness creates
 `PSModule/PSModule.psd1` from repository inspection and then returns its validated
 model. The scaffold infers repository identity, a documented GHCR image reference,
-standalone `*.ps1` scripts in the repository root and beneath `scripts` directories,
-and explicitly exported functions from modules beneath `modules` directories. Review inferred commands and add runtime
+standalone `*.ps1` scripts and explicitly exported functions from `.psm1` modules
+beneath the repository's `scripts` directory. Files elsewhere in the repository are
+not inferred as commands. Review inferred commands and add runtime
 mappings before publishing. An existing specification with no commands is refreshed
 from discovery. Generated, unmapped scaffolds are refreshed on later runs so newly
 discovered scripts appear automatically; authored specifications and scaffolds with
@@ -281,10 +282,11 @@ Invoke-MyCommand -Verbose
 Inferred commands with `SourceKind = 'Script'` invoke their discovered `.ps1` file
 from the generated module's `Scripts` directory. Inferred `ModuleFunction` commands
 import their packaged `.psm1` from the generated module's `Modules` directory and
-invoke the exported function module-qualified. Original relative paths are preserved
-beneath those directories, and generated wrappers resolve them relative to the module
-instead of embedding development-machine paths. Commands without a supported source
-kind remain container wrappers and require a real `ContainerImage` plus runtime mappings.
+invoke the exported function module-qualified. Paths relative to the source
+`scripts` directory are preserved beneath those generated directories, and wrappers
+resolve them relative to the module instead of embedding development-machine paths.
+Commands without a supported source kind remain container wrappers and require a
+real `ContainerImage` plus runtime mappings.
 
 ### Run the tests
 

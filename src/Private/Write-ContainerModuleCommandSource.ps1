@@ -36,6 +36,15 @@ function Write-ContainerModuleCommandSource {
                     "SourcePath for command '$($command.Name)' resolves outside the repository."
                 )
             }
+            $scriptsPrefix = (Join-Path $Context.RepositoryPath 'scripts').TrimEnd(
+                [IO.Path]::DirectorySeparatorChar,
+                [IO.Path]::AltDirectorySeparatorChar
+            ) + [IO.Path]::DirectorySeparatorChar
+            if (-not $resolvedSourcePath.StartsWith($scriptsPrefix, [StringComparison]::OrdinalIgnoreCase)) {
+                throw [System.IO.InvalidDataException]::new(
+                    "SourcePath for command '$($command.Name)' must be beneath the repository's 'scripts' directory."
+                )
+            }
             if (-not (Test-Path -LiteralPath $resolvedSourcePath -PathType Leaf)) {
                 throw [System.IO.FileNotFoundException]::new(
                     "SourcePath for command '$($command.Name)' was not found.",
@@ -44,11 +53,11 @@ function Write-ContainerModuleCommandSource {
             }
 
             $packageDirectory = if ($sourceKind -eq 'Script') { 'Scripts' } else { 'Modules' }
-            $normalizedDeclaredPath = $declaredSourcePath.Replace(
-                [IO.Path]::AltDirectorySeparatorChar,
-                [IO.Path]::DirectorySeparatorChar
+            $scriptsRelativePath = [IO.Path]::GetRelativePath(
+                (Join-Path $Context.RepositoryPath 'scripts'),
+                $resolvedSourcePath
             )
-            $packagedSourcePath = Join-Path $packageDirectory $normalizedDeclaredPath
+            $packagedSourcePath = Join-Path $packageDirectory $scriptsRelativePath
             $destinationPath = Join-Path $Context.OutputPath $packagedSourcePath
             $null = New-Item -Path (Split-Path $destinationPath -Parent) -ItemType Directory -Force
             Copy-Item -LiteralPath $resolvedSourcePath -Destination $destinationPath -Force

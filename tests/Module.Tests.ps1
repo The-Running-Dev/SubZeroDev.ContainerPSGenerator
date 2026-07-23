@@ -686,10 +686,7 @@ jobs:
         $powerShell.ParseErrors.Count | Should -Be 0
 
         $rootCommand = $inspection.PowerShellFiles | Where-Object Path -eq 'root-tool.ps1'
-        $rootCommand.IsCommandCandidate | Should -BeTrue
-        $rootCommand.SuggestedCommandName | Should -Be 'Invoke-RootTool'
-        $rootCommand.Parameters.Name | Should -Be 'Name'
-        $rootCommand.Parameters.Mandatory | Should -BeTrue
+        $rootCommand | Should -BeNullOrEmpty
 
         $scriptCommand = $inspection.PowerShellFiles | Where-Object Path -eq 'scripts/run-tool.ps1'
         $scriptCommand.IsCommandCandidate | Should -BeTrue
@@ -2454,7 +2451,7 @@ Describe 'Test-LocalRepository script' {
         $originalLocation = Get-Location
         $repositoryPath = Join-Path $TestDrive 'InferredRepository'
         $scriptsPath = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
-        $modulesPath = New-Item -Path (Join-Path $repositoryPath 'modules') -ItemType Directory -Force
+        $modulesPath = New-Item -Path (Join-Path $scriptsPath 'modules') -ItemType Directory -Force
         Set-Content -LiteralPath (Join-Path $repositoryPath 'README.md') -Value @'
 # Inferred Repository
 docker run --rm ghcr.io/example/inferred:latest
@@ -2477,14 +2474,13 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         $definition.GeneratedBy | Should -Be 'SubZeroDev.ContainerPSGenerator'
         $definition.ModuleName | Should -Be 'InferredRepository'
         $definition.ContainerImage | Should -Be 'ghcr.io/example/inferred:latest'
-        $definition.Commands.Name | Should -Be @('Invoke-ContainerTool', 'Test-RepositoryTool', 'Invoke-InstallTool')
+        $definition.Commands.Name | Should -Be @('Invoke-InstallTool', 'Test-RepositoryTool')
         $definition.Commands[0].SourceKind | Should -Be 'Script'
-        $definition.Commands[0].Parameters.Name | Should -Be 'Tag'
+        $definition.Commands[0].Parameters.Name | Should -Be @('Name', 'Force')
+        $definition.Commands[0].Parameters[0].Mandatory | Should -BeTrue
         $definition.Commands[1].SourceKind | Should -Be 'ModuleFunction'
-        $definition.Commands[2].Parameters.Name | Should -Be @('Name', 'Force')
-        $definition.Commands[2].Parameters[0].Mandatory | Should -BeTrue
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-ContainerTool.ps1') |
-            Should -BeTrue
+            Should -BeFalse
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-InstallTool.ps1') |
             Should -BeTrue
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Test-RepositoryTool.ps1') |
@@ -2515,7 +2511,7 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         (Get-Content -LiteralPath $specificationPath -Raw).Trim() | Should -Be $authoredSource
     }
 
-    It 'refreshes a legacy generated scaffold when root scripts are discovered' {
+    It 'refreshes a legacy generated scaffold using only scripts-directory sources' {
         $repositoryPath = Join-Path $TestDrive 'LegacyGeneratedRepository'
         $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
         $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
@@ -2533,12 +2529,15 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
     )
 }
 '@
-        Set-Content -LiteralPath (Join-Path $repositoryPath 'setup.ps1') -Value 'param([switch] $Force)'
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'setup.ps1') -Value 'param([switch] $Ignored)'
+        $scriptsPath = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $scriptsPath 'setup.ps1') -Value 'param([switch] $Force)'
 
         $commands = @(& $scriptPath -Repository $repositoryPath -ListCommands)
         $definition = Import-PowerShellDataFile $specificationPath
 
         $definition.Commands.Name | Should -Be 'Invoke-Setup'
+        $definition.Commands[0].Parameters.Name | Should -Be 'Force'
         $commands.Name | Should -Contain 'Invoke-Setup'
         Remove-Module LegacyGeneratedRepository -Force
     }
@@ -2557,7 +2556,8 @@ Describe 'Discovered PowerShell source execution' {
     It 'invokes a discovered script with its bound parameters instead of Docker' {
         $repositoryPath = Join-Path $TestDrive 'source-repository'
         $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
-        $sourcePath = Join-Path $repositoryPath 'run-source.ps1'
+        $scriptsDirectory = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
+        $sourcePath = Join-Path $scriptsDirectory 'run-source.ps1'
         $resultPath = Join-Path $repositoryPath 'result.txt'
         Set-Content -LiteralPath $sourcePath -Value @'
 param([Parameter(Mandatory)][string] $Value, [Parameter(Mandatory)][string] $ResultPath)
@@ -2570,7 +2570,7 @@ Set-Content -LiteralPath $ResultPath -Value $Value
     Commands = @(@{
         Name = 'Invoke-SourceExample'
         SourceKind = 'Script'
-        SourcePath = 'run-source.ps1'
+        SourcePath = 'scripts/run-source.ps1'
         Parameters = @(
             @{ Name = 'Value'; Type = 'string'; Mandatory = $true }
             @{ Name = 'ResultPath'; Type = 'string'; Mandatory = $true }
@@ -2610,7 +2610,7 @@ Set-Content -LiteralPath $ResultPath -Value $Value
     It 'invokes a discovered exported module function module-qualified instead of Docker' {
         $repositoryPath = Join-Path $TestDrive 'module-source-repository'
         $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
-        $modulesDirectory = New-Item -Path (Join-Path $repositoryPath 'modules') -ItemType Directory -Force
+        $modulesDirectory = New-Item -Path (Join-Path $repositoryPath 'scripts' 'modules') -ItemType Directory -Force
         $sourcePath = Join-Path $modulesDirectory 'SourceTools.psm1'
         $resultPath = Join-Path $repositoryPath 'module-result.txt'
         Set-Content -LiteralPath $sourcePath -Value @'
@@ -2627,7 +2627,7 @@ Export-ModuleMember -Function Invoke-SourceTool
     Commands = @(@{
         Name = 'Invoke-SourceTool'
         SourceKind = 'ModuleFunction'
-        SourcePath = 'modules/SourceTools.psm1'
+        SourcePath = 'scripts/modules/SourceTools.psm1'
         Parameters = @(
             @{ Name = 'Value'; Type = 'string'; Mandatory = $true }
             @{ Name = 'ResultPath'; Type = 'string'; Mandatory = $true }
@@ -2653,5 +2653,29 @@ Export-ModuleMember -Function Invoke-SourceTool
             Remove-Module $module -Force
             Remove-Module SourceTools -Force -ErrorAction SilentlyContinue
         }
+    }
+
+    It 'rejects an authored PowerShell source outside the scripts directory' {
+        $repositoryPath = Join-Path $TestDrive 'outside-source-repository'
+        $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'outside.ps1') -Value 'param()'
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'OutsideSource'
+    Commands = @(@{
+        Name = 'Invoke-Outside'
+        SourceKind = 'Script'
+        SourcePath = 'outside.ps1'
+        Parameters = @()
+    })
+}
+'@
+
+        {
+            Build-ContainerModule -Specification $specificationPath -Output (
+                Join-Path $repositoryPath 'artifacts'
+            )
+        } | Should -Throw "*must be beneath the repository's 'scripts' directory*"
     }
 }
