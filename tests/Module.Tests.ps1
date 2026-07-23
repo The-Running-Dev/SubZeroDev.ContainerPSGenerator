@@ -725,6 +725,42 @@ jobs:
         @($inspection.ConfigurationSchemas).Count | Should -Be 0
         $inspection.PowerShellFiles.Path | Should -Not -Contain 'nested/Nested.ps1'
     }
+
+    It 'persists schemas with missing, empty, or null property collections' {
+        $schemas = New-Item -Path (Join-Path $TestDrive 'schemas') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'missing.schema.json') -Value @'
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "type": "string" }
+'@
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'empty.schema.json') -Value @'
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "properties": {}, "required": [] }
+'@
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'null.schema.json') -Value @'
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "properties": null, "required": null }
+'@
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'cache.json') -Value 'definitely not json'
+
+        $artifact = Build-ContainerModule
+        $inspection = (Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json).Inspection
+
+        $inspection.ConfigurationSchemas.Path | Should -Be @(
+            'schemas/empty.schema.json'
+            'schemas/missing.schema.json'
+            'schemas/null.schema.json'
+        )
+        foreach ($schema in $inspection.ConfigurationSchemas) {
+            @($schema.Properties).Count | Should -Be 0
+            @($schema.Required).Count | Should -Be 0
+        }
+    }
+
+    It 'rejects malformed files explicitly named as configuration schemas' {
+        $schemas = New-Item -Path (Join-Path $TestDrive 'schemas') -ItemType Directory -Force
+        $schemaPath = Join-Path $schemas.FullName 'invalid.schema.json'
+        Set-Content -LiteralPath $schemaPath -Value 'definitely not json'
+
+        { Build-ContainerModule } |
+            Should -Throw "*Configuration schema '$schemaPath' is not valid JSON*"
+    }
 }
 
 Describe 'Build-ContainerModule command validation' {

@@ -6,11 +6,30 @@ $items = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File -Fi
 [Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
 
 $schemas = foreach ($item in $items) {
-    $data = Get-Content -LiteralPath $item.FullName -Raw | ConvertFrom-Json
+    try {
+        $data = Get-Content -LiteralPath $item.FullName -Raw | ConvertFrom-Json -ErrorAction Stop
+    }
+    catch {
+        if ($item.Name -match '\.schema\.json$') {
+            throw [System.IO.InvalidDataException]::new(
+                "Configuration schema '$($item.FullName)' is not valid JSON.",
+                $_.Exception
+            )
+        }
+        continue
+    }
     if ($item.Name -notmatch '\.schema\.json$' -and -not $data.PSObject.Properties['$schema']) { continue }
-    $properties = if ($data.PSObject.Properties['properties']) { @($data.properties.PSObject.Properties.Name) } else { @() }
+    [string[]] $properties = @(
+        if ($null -ne $data.PSObject.Properties['properties'] -and $null -ne $data.properties) {
+            $data.properties.PSObject.Properties | ForEach-Object Name
+        }
+    )
     [Array]::Sort($properties, [StringComparer]::Ordinal)
-    $required = if ($data.PSObject.Properties['required']) { @($data.required) } else { @() }
+    [string[]] $required = @(
+        if ($null -ne $data.PSObject.Properties['required'] -and $null -ne $data.required) {
+            $data.required
+        }
+    )
     [Array]::Sort($required, [StringComparer]::Ordinal)
     [ordered]@{
         Path = [IO.Path]::GetRelativePath($Context.RepositoryPath,$item.FullName).Replace('\','/')
