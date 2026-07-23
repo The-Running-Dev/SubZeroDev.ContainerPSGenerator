@@ -235,7 +235,18 @@ When the target does not contain a specification, the harness creates
 model. The scaffold infers repository identity, a documented GHCR image reference,
 standalone scripts beneath `scripts` directories, and explicitly exported functions
 from modules beneath `modules` directories. Review inferred commands and add runtime
-mappings before publishing. Use `-NoInitialize` to retain fail-if-missing behavior.
+mappings before publishing. An existing specification with no commands is refreshed
+from discovery; authored command collections are always preserved. Initial creation
+or refresh also materializes the inferred commands under `artifacts/PSModule/Public`
+while returning the validated model. Use `-NoInitialize` to retain strict behavior
+without creation or refresh.
+
+To materialize inferred definitions as importable command files under
+`artifacts/PSModule/Public`, run:
+
+```powershell
+./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository -Generate
+```
 
 The script imports this checkout of ContainerPSGenerator, validates the target repository's specification, and returns its normalized object model. Select non-default paths when needed:
 

@@ -1,10 +1,7 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
-$excluded = @('.git','node_modules','artifacts','bin','obj')
-$outputPrefix = $Context.OutputPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 $items = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File -Filter '*.json' | Where-Object {
-    -not $_.FullName.StartsWith($outputPrefix, [StringComparison]::OrdinalIgnoreCase) -and
-    -not (@($_.FullName.Substring($Context.RepositoryPath.Length).Split([IO.Path]::DirectorySeparatorChar, [StringSplitOptions]::RemoveEmptyEntries)) | Where-Object { $_ -in $excluded })
+    Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName
 })
 [Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
 

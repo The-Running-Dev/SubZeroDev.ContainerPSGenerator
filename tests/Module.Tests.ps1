@@ -700,6 +700,19 @@ jobs:
         $openApi.Title | Should -Be 'Example API'
         $openApi.Paths | Should -Be @('/health', '/users')
     }
+
+    It 'does not inspect files inside nested Git repositories' {
+        $nestedPath = New-Item -Path (Join-Path $TestDrive 'nested') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $nestedPath '.git') -Value 'gitdir: ../.git/modules/nested'
+        Set-Content -LiteralPath (Join-Path $nestedPath 'invalid.schema.json') -Value 'definitely not json'
+        Set-Content -LiteralPath (Join-Path $nestedPath 'Nested.ps1') -Value 'function Invoke-Nested { }'
+
+        $artifact = Build-ContainerModule
+        $inspection = (Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json).Inspection
+
+        @($inspection.ConfigurationSchemas).Count | Should -Be 0
+        $inspection.PowerShellFiles.Path | Should -Not -Contain 'nested/Nested.ps1'
+    }
 }
 
 Describe 'Build-ContainerModule command validation' {
@@ -2446,6 +2459,33 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         $definition.Commands[0].SourceKind | Should -Be 'ModuleFunction'
         $definition.Commands[1].Parameters.Name | Should -Be @('Name', 'Force')
         $definition.Commands[1].Parameters[0].Mandatory | Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-InstallTool.ps1') |
+            Should -BeTrue
+        Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Test-RepositoryTool.ps1') |
+            Should -BeTrue
         (Get-Location).Path | Should -Be $originalLocation.Path
+    }
+
+    It 'refreshes an empty specification but preserves authored commands' {
+        $repositoryPath = Join-Path $TestDrive 'RefreshRepository'
+        $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
+        $scriptsPath = New-Item -Path (Join-Path $repositoryPath 'scripts') -ItemType Directory -Force
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value '@{ ModuleName = ''Old''; Commands = @() }'
+        Set-Content -LiteralPath (Join-Path $scriptsPath 'run-tool.ps1') -Value 'param([string] $Value)'
+
+        & $scriptPath -Repository $repositoryPath | Out-Null
+
+        $refreshed = Import-PowerShellDataFile $specificationPath
+        $refreshed.ModuleName | Should -Be 'RefreshRepository'
+        $refreshed.Commands.Name | Should -Be 'Invoke-RunTool'
+        Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-RunTool.ps1') |
+            Should -BeTrue
+
+        $authoredSource = "@{ ModuleName = 'Authored'; Commands = @(@{ Name = 'Invoke-Authored'; Parameters = @() }) }"
+        Set-Content -LiteralPath $specificationPath -Value $authoredSource
+        & $scriptPath -Repository $repositoryPath | Out-Null
+
+        (Get-Content -LiteralPath $specificationPath -Raw).Trim() | Should -Be $authoredSource
     }
 }

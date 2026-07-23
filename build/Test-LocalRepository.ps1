@@ -19,7 +19,7 @@ Generation output path relative to Repository, or an absolute path.
 Runs Build-ContainerModule after model validation and returns the generated artifacts.
 
 .PARAMETER NoInitialize
-Fails when Specification is missing instead of creating an inferred scaffold.
+Fails when Specification is missing and prevents refreshing an empty scaffold.
 #>
 [CmdletBinding()]
 param (
@@ -54,7 +54,18 @@ Import-Module $manifestPath -Force -ErrorAction Stop
 
 Push-Location $repositoryPath
 try {
-    if (-not (Test-Path -LiteralPath $Specification -PathType Leaf)) {
+    $specificationInitialized = $false
+    $specificationExists = Test-Path -LiteralPath $Specification -PathType Leaf
+    $refreshEmptySpecification = $false
+    if ($specificationExists -and -not $NoInitialize) {
+        $existingDefinition = Import-PowerShellDataFile -LiteralPath $Specification -ErrorAction Stop
+        $refreshEmptySpecification = (
+            -not $existingDefinition.ContainsKey('Commands') -or
+            @($existingDefinition.Commands).Count -eq 0
+        )
+    }
+
+    if (-not $specificationExists -or $refreshEmptySpecification) {
         if ($NoInitialize) {
             throw [System.IO.FileNotFoundException]::new(
                 "Container module specification was not found: '$(Join-Path $repositoryPath $Specification)'."
@@ -62,13 +73,22 @@ try {
         }
         Initialize-ContainerModuleSpecification `
             -Repository $repositoryPath `
-            -Specification $Specification |
+            -Specification $Specification `
+            -Force:$refreshEmptySpecification |
             Out-Null
-        Write-Host "Created inferred container module specification: $Specification" -ForegroundColor Green
+        $action = if ($refreshEmptySpecification) { 'Refreshed' } else { 'Created' }
+        Write-Host "$action inferred container module specification: $Specification" -ForegroundColor Green
+        $specificationInitialized = $true
     }
 
+    if ($Generate -or $specificationInitialized) {
+        $artifact = Build-ContainerModule -Specification $Specification -Output $Output
+        if ($specificationInitialized -and -not $Generate) {
+            Write-Host "Generated inferred container module: $Output" -ForegroundColor Green
+        }
+        if ($Generate) { $artifact }
+    }
     if ($Generate) {
-        Build-ContainerModule -Specification $Specification -Output $Output
         return
     }
 
