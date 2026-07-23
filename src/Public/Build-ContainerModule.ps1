@@ -46,7 +46,9 @@ function Build-ContainerModule {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage Inspectors
     }
 
-    Assert-ContainerModuleSpecification -Specification $context.Specification
+    Invoke-ContainerModuleSpecificationValidation `
+        -Specification $context.Specification `
+        -SpecificationPath $context.SpecificationPath
     $context.Model = ConvertTo-ContainerModuleModel -Specification $context.Specification
     $context.Model | Add-Member -MemberType NoteProperty -Name Inspection -Value $context.Inspection
 

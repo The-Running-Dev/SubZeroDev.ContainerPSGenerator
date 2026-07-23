@@ -62,6 +62,16 @@ Describe 'Container module inspection diagnostics' {
         $diagnostics.ExecutionOrder | Should -Be @(0..($diagnostics.Count - 1))
         $diagnostics.Succeeded | Should -Not -Contain $false
         $diagnostics.DurationMilliseconds | ForEach-Object { $_ | Should -BeGreaterOrEqual 0 }
+        $diagnostics[0].PSObject.Properties.Name | Should -Not -Contain 'Path'
+    }
+
+    It 'returns detailed diagnostics for troubleshooting' {
+        $diagnostic = Get-ContainerModuleDiagnostic -Specification $specificationPath -Detailed |
+            Select-Object -First 1
+
+        $diagnostic.Path | Should -Exist
+        $diagnostic.StartedAt | Should -BeOfType ([DateTimeOffset])
+        $diagnostic.PSObject.Properties.Name | Should -Contain 'Error'
     }
 
     It 'can run diagnostics directly from a specification' {
@@ -218,6 +228,19 @@ Describe 'Test-ContainerModuleSpecification' {
 
         { Test-ContainerModuleSpecification -Specification $specificationPath } |
             Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*non-empty string 'Type'*"
+    }
+
+    It 'includes source and object identity context in validation errors' {
+        $specificationPath = Join-Path $TestDrive 'InvalidWithIds.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{ Commands = @(@{ Id = 'command.invoke-example'; Name = 'Invoke-Example'; Parameters = @(
+    @{ Id = 'parameter.message'; Name = 'Message' }
+) }) }
+'@
+
+        { Test-ContainerModuleSpecification -Specification $specificationPath } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) `
+                -ExpectedMessage "*non-empty string 'Type'*Source: '$specificationPath'*Object Id: 'command.invoke-example', 'parameter.message'*"
     }
 }
 

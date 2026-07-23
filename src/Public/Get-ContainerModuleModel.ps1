@@ -17,6 +17,8 @@ function Get-ContainerModuleModel {
     )
 
     $specificationData = Import-ContainerModuleSpecification -Path $Specification
-    Assert-ContainerModuleSpecification -Specification $specificationData
+    Invoke-ContainerModuleSpecificationValidation `
+        -Specification $specificationData `
+        -SpecificationPath $Specification
     ConvertTo-ContainerModuleModel -Specification $specificationData
 }
