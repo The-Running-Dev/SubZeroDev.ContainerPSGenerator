@@ -402,6 +402,78 @@ services:
     }
 }
 
+Describe 'Project manifest inspection' {
+    BeforeEach {
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'src') -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'node_modules') -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists .NET and Node project metadata in normalized path order' {
+        $dotNetPath = New-Item -Path (Join-Path $TestDrive 'src' 'Api') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $dotNetPath.FullName 'Api.csproj') -Value @'
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Example.Api</AssemblyName>
+    <PackageId>Example.Api.Package</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Example.Package"><Version>1.2.3</Version></PackageReference>
+  </ItemGroup>
+</Project>
+'@
+        $nodePath = New-Item -Path (Join-Path $TestDrive 'src' 'Web') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $nodePath.FullName 'package.json') -Value @'
+{
+  "name": "example-web",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": { "test": "vitest", "build": "vite build" },
+  "dependencies": { "react": "latest", "axios": "latest" },
+  "devDependencies": { "vite": "latest" }
+}
+'@
+        $ignoredPath = New-Item -Path (Join-Path $TestDrive 'node_modules' 'ignored') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $ignoredPath.FullName 'package.json') -Value '{ "name": "ignored" }'
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $dotNet = $metadata.Inspection.DotNetProjects[0]
+        $dotNet.Path | Should -Be 'src/Api/Api.csproj'
+        $dotNet.Sdk | Should -Be 'Microsoft.NET.Sdk.Web'
+        $dotNet.TargetFrameworks | Should -Be @('net8.0', 'net9.0')
+        $dotNet.PackageReferences.Name | Should -Be @('Serilog', 'Example.Package')
+        $dotNet.PackageReferences.Version | Should -Be @('3.1.1', '1.2.3')
+
+        $node = $metadata.Inspection.NodeProjects[0]
+        $node.Path | Should -Be 'src/Web/package.json'
+        $node.Name | Should -Be 'example-web'
+        $node.Private | Should -BeTrue
+        $node.Scripts | Should -Be @('build', 'test')
+        $node.Dependencies | Should -Be @('axios', 'react')
+        $metadata.Inspection.NodeProjects.Count | Should -Be 1
+    }
+
+    It 'persists empty collections when no supported project manifests exist' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.DotNetProjects).Count | Should -Be 0
+        @($metadata.Inspection.NodeProjects).Count | Should -Be 0
+    }
+}
+
 Describe 'Build-ContainerModule command validation' {
     BeforeEach {
         Push-Location $TestDrive
