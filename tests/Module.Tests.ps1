@@ -348,6 +348,60 @@ FROM mcr.microsoft.com/dotnet/runtime:8.0 AS final
     }
 }
 
+Describe 'Docker Compose inspection' {
+    BeforeEach {
+        foreach ($name in @('compose.yaml', 'compose.yml', 'docker-compose.yaml', 'docker-compose.yml')) {
+            Remove-Item -LiteralPath (Join-Path $TestDrive $name) -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists ordered Compose service runtime and build metadata' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'compose.yaml') -Value @'
+services:
+  api:
+    build:
+      context: .
+      dockerfile: src/Api.Dockerfile
+    ports:
+      - "8080:80"
+      - 8443:443
+  worker:
+    image: ghcr.io/example/worker:latest
+'@
+        Set-Content -LiteralPath (Join-Path $TestDrive 'docker-compose.yml') -Value @'
+services:
+  tools:
+    build: ./tools
+'@
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $metadata.Inspection.ComposeFiles.Path | Should -Be @('compose.yaml', 'docker-compose.yml')
+        $api = $metadata.Inspection.ComposeFiles[0].Services[0]
+        $api.Name | Should -Be 'api'
+        $api.Build.Context | Should -Be '.'
+        $api.Build.Dockerfile | Should -Be 'src/Api.Dockerfile'
+        $api.Ports | Should -Be @('8080:80', '8443:443')
+        $metadata.Inspection.ComposeFiles[0].Services[1].Image | Should -Be 'ghcr.io/example/worker:latest'
+        $metadata.Inspection.ComposeFiles[1].Services[0].Build.Context | Should -Be './tools'
+    }
+
+    It 'persists an empty collection when no Compose file exists' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.ComposeFiles).Count | Should -Be 0
+    }
+}
+
 Describe 'Build-ContainerModule command validation' {
     BeforeEach {
         Push-Location $TestDrive
