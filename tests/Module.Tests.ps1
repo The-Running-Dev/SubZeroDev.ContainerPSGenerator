@@ -1892,6 +1892,30 @@ Describe 'Container module loader generation' {
             Remove-Module ExampleContainer -Force
         }
     }
+
+    It 'imports without a Public directory when the module has no commands' {
+        $specificationPath = Join-Path $TestDrive 'EmptyLoader.psd1'
+        $outputPath = Join-Path $TestDrive 'empty-loader-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'EmptyContainer'
+    Commands = @()
+}
+'@
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+
+        Test-Path -LiteralPath (Join-Path $outputPath 'Public') | Should -BeFalse
+        $module = Import-Module (
+            Join-Path $outputPath 'EmptyContainer.psd1'
+        ) -Force -PassThru -ErrorAction Stop
+        try {
+            @(Get-Command -Module $module.Name).Count | Should -Be 0
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
 }
 
 Describe 'Container module manifest generation' {
@@ -2621,6 +2645,19 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         (Get-Command Invoke-ExternalRepository -ErrorAction Stop).ModuleName | Should -Be 'PSModule'
 
         Remove-Module PSModule -Force
+    }
+
+    It 'returns no commands when repository discovery produces an empty module' {
+        $emptyRepositoryPath = Join-Path $TestDrive 'EmptyRepository'
+        New-Item -Path $emptyRepositoryPath -ItemType Directory -Force | Out-Null
+
+        $commands = @(& $scriptPath -Repository $emptyRepositoryPath -ListCommands)
+
+        $commands.Count | Should -Be 0
+        Test-Path -LiteralPath (
+            Join-Path $emptyRepositoryPath 'artifacts' 'PSModule' 'Public'
+        ) | Should -BeFalse
+        Remove-Module EmptyRepository -Force -ErrorAction SilentlyContinue
     }
 }
 
