@@ -529,6 +529,82 @@ unlabelled
     }
 }
 
+Describe 'Remaining repository inspector chain' {
+    BeforeEach {
+        foreach ($path in @('.github', '.nuke', 'build', 'scripts', 'schemas', 'api')) {
+            Remove-Item -LiteralPath (Join-Path $TestDrive $path) -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach { Pop-Location }
+
+    It 'persists PowerShell, workflow, NUKE, schema, and OpenAPI metadata' {
+        $scripts = New-Item -Path (Join-Path $TestDrive 'scripts') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $scripts.FullName 'Tools.psm1') -Value @'
+class ToolOptions {}
+function Invoke-Tool { param() }
+'@
+
+        $workflows = New-Item -Path (Join-Path $TestDrive '.github' 'workflows') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $workflows.FullName 'ci.yml') -Value @'
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+'@
+
+        $nuke = New-Item -Path (Join-Path $TestDrive '.nuke') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $nuke.FullName 'parameters.json') -Value '{ "Configuration": "Release", "Verbosity": "Normal" }'
+        $build = New-Item -Path (Join-Path $TestDrive 'build') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $build.FullName 'Build.csproj') -Value @'
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Nuke.Common" Version="8.0.0" /></ItemGroup></Project>
+'@
+        Set-Content -LiteralPath (Join-Path $build.FullName 'build.ps1') -Value 'function Invoke-Build { }'
+
+        $schemas = New-Item -Path (Join-Path $TestDrive 'schemas') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'settings.schema.json') -Value @'
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "example.settings", "title": "Settings", "type": "object", "required": ["name"], "properties": { "port": {}, "name": {} } }
+'@
+        $api = New-Item -Path (Join-Path $TestDrive 'api') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $api.FullName 'openapi.json') -Value @'
+{ "openapi": "3.1.0", "info": { "title": "Example API", "version": "1.2.0" }, "paths": { "/users": {}, "/health": {} } }
+'@
+
+        $artifact = Build-ContainerModule
+        $inspection = (Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json).Inspection
+
+        $powerShell = $inspection.PowerShellFiles | Where-Object Path -eq 'scripts/Tools.psm1'
+        $powerShell.Functions | Should -Be @('Invoke-Tool')
+        $powerShell.Classes | Should -Be @('ToolOptions')
+        $powerShell.ParseErrors.Count | Should -Be 0
+
+        $inspection.GitHubActions[0].Name | Should -Be 'CI'
+        $inspection.GitHubActions[0].Triggers | Should -Be @('push', 'pull_request')
+        $inspection.GitHubActions[0].Jobs | Should -Be @('test')
+
+        $inspection.Nuke.IsConfigured | Should -BeTrue
+        $inspection.Nuke.ParameterNames | Should -Be @('Configuration', 'Verbosity')
+        $inspection.Nuke.ProjectPaths | Should -Be @('build/Build.csproj')
+        $inspection.Nuke.BuildScripts | Should -Be @('build/build.ps1')
+
+        $schema = $inspection.ConfigurationSchemas[0]
+        $schema.Id | Should -Be 'example.settings'
+        $schema.Required | Should -Be @('name')
+        $schema.Properties | Should -Be @('name', 'port')
+
+        $openApi = $inspection.OpenApiDocuments[0]
+        $openApi.SpecificationVersion | Should -Be '3.1.0'
+        $openApi.Title | Should -Be 'Example API'
+        $openApi.Paths | Should -Be @('/health', '/users')
+    }
+}
+
 Describe 'Build-ContainerModule command validation' {
     BeforeEach {
         Push-Location $TestDrive

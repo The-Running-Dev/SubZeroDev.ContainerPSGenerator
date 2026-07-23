@@ -37,10 +37,12 @@ function Get-JsonPropertyValue {
 }
 
 $excludedDirectories = @('.git', 'node_modules', 'artifacts', 'bin', 'obj')
+$outputPrefix = $Context.OutputPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 $manifestItems = @(
     Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File |
         Where-Object {
             ($_.Extension -eq '.csproj' -or $_.Name -eq 'package.json') -and
+            -not $_.FullName.StartsWith($outputPrefix, [StringComparison]::OrdinalIgnoreCase) -and
             -not (@($_.FullName.Substring($Context.RepositoryPath.Length).Split(
                 [System.IO.Path]::DirectorySeparatorChar,
                 [System.StringSplitOptions]::RemoveEmptyEntries

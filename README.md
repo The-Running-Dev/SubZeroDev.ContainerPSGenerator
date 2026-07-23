@@ -31,13 +31,14 @@ The current implementation supports the complete basic workflow from a repositor
 - Inspect root-level Docker Compose files and persist ordered service image, build context, Dockerfile, and port metadata.
 - Inspect .NET and Node project manifests while excluding generated and dependency directories.
 - Inspect root README title, heading hierarchy, and fenced-code language metadata.
+- Inspect PowerShell ASTs, GitHub Actions workflows, NUKE markers, JSON configuration schemas, and OpenAPI documents.
 - Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
 - Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
 
-Still planned for Version 1 are additional repository inspectors, richer user-facing diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+Still planned for Version 1 are richer user-facing diagnostics and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
 ## How it is intended to work
 
