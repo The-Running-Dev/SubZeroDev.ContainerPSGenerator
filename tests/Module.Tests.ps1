@@ -13,6 +13,7 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
 
         $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
+        $exportedCommands.Name | Should -Contain 'Get-ContainerModulePlugin'
         $exportedCommands.Name | Should -Contain 'Install-ContainerModule'
         $exportedCommands.Name | Should -Contain 'Test-ContainerModuleSpecification'
     }
@@ -24,6 +25,53 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Get-ContainerModulePlugin' {
+    BeforeEach {
+        $pluginRoot = Join-Path $TestDrive 'Plugins'
+        New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pluginRoot 'Validators') -ItemType Directory -Force | Out-Null
+    }
+
+    It 'returns plugins in pipeline stage and lexical filename order' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '10.ReadmeInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.DockerfileInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.SpecificationValidator.ps1') -Value '# plugin'
+
+        $plugins = @(Get-ContainerModulePlugin -Path $pluginRoot)
+
+        $plugins.FileName | Should -Be @(
+            '00.DockerfileInspector.ps1'
+            '10.ReadmeInspector.ps1'
+            '00.SpecificationValidator.ps1'
+        )
+        $plugins.ExecutionOrder | Should -Be @(0, 1, 2)
+        $plugins[0].PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.PluginInfo'
+    }
+
+    It 'can limit discovery to selected stages' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.DockerfileInspector.ps1') -Value '# plugin'
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.SpecificationValidator.ps1') -Value '# plugin'
+
+        $plugin = Get-ContainerModulePlugin -Path $pluginRoot -Stage Validators
+
+        $plugin.Stage | Should -Be 'Validators'
+        $plugin.Name | Should -Be 'SpecificationValidator'
+        $plugin.Prefix | Should -Be 0
+    }
+
+    It 'rejects plugin filenames without a numeric ordering prefix' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' 'DockerfileInspector.ps1') -Value '# plugin'
+
+        { Get-ContainerModulePlugin -Path $pluginRoot } |
+            Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*numeric-prefix*"
+    }
+
+    It 'rejects a missing plugin root' {
+        { Get-ContainerModulePlugin -Path (Join-Path $TestDrive 'missing') } |
+            Should -Throw -ExceptionType ([System.IO.DirectoryNotFoundException]) -ExpectedMessage '*was not found*'
     }
 }
 
