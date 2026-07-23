@@ -28,7 +28,7 @@ work queue.
   instead of testing only the development module under `src/`.
 - [x] Add maintained integration fixtures for representative script-only and
   build-agent repositories without embedding external source checkouts.
-- [ ] Expand `examples/Minimal` into a buildable, runnable container example covering
+- [x] Expand `examples/Minimal` into a buildable, runnable container example covering
   generate, build, install, import, invoke, help, and cleanup.
 - [ ] Verify generated Markdown documentation in the packaged module end-to-end.
 - [ ] Reconcile `Specifications.md`, `README.md`, command help, examples, and generated

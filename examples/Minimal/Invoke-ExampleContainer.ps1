@@ -8,15 +8,10 @@ $message = if ($messageIndex -ge 0 -and $messageIndex + 1 -lt $args.Count) {
 else {
     $null
 }
+$readmePath = '/repository/README.md'
 
 [ordered] @{
     Message            = $message
-    EnvironmentValue   = $env:E2E_VALUE
-    MountedFileExists  = Test-Path -LiteralPath '/workspace/sentinel.txt' -PathType Leaf
-    MountedFileContent = if (Test-Path -LiteralPath '/workspace/sentinel.txt' -PathType Leaf) {
-        Get-Content -LiteralPath '/workspace/sentinel.txt' -Raw
-    }
-    else {
-        $null
-    }
+    EnvironmentMessage = $env:EXAMPLE_MESSAGE
+    MountedReadme      = Test-Path -LiteralPath $readmePath -PathType Leaf
 } | ConvertTo-Json -Compress

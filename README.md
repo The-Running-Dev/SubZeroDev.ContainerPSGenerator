@@ -183,6 +183,16 @@ Test-ContainerModuleSpecification `
 
 A valid specification returns `True`. Invalid files produce a focused error identifying the first rule that failed. Copy the example PSD1 to experiment with command and parameter definitions.
 
+The same example is a complete, CI-tested container workflow. With Docker running,
+generate, build, install, import, invoke, inspect help, and clean up in one command:
+
+```powershell
+./examples/Minimal/Run-Example.ps1
+```
+
+See [the minimal example guide](examples/Minimal/README.md) for the equivalent
+step-by-step commands or use `-KeepArtifacts` to inspect its generated package.
+
 `Build-ContainerModule` loads and validates the specification, builds the normalized model, clears the selected output directory, and writes a deterministic module package:
 
 ```powershell
@@ -332,7 +342,10 @@ $configuration.Output.Verbosity = 'Detailed'
 Invoke-Pester -Configuration $configuration
 ```
 
-This generates `ContainerE2E`, embeds it at `/PSModule` in a Linux image, installs and imports it from that image, invokes its generated command with argument/environment/mount mappings, verifies help and `-WhatIf`, and removes the temporary image afterward.
+This generates the checked-in `examples/Minimal` module, embeds it at `/PSModule` in
+a Linux image, installs and imports it from that image, invokes its generated command
+with argument/environment/mount mappings, verifies help and `-WhatIf`, and removes
+the temporary image afterward.
 
 To exercise the GitHub Actions workflow locally, install [Docker](https://docs.docker.com/get-docker/) and [act](https://nektosact.com/installation/index.html), ensure Docker is running, and execute:
 

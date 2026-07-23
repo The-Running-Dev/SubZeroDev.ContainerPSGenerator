@@ -2,7 +2,7 @@
     Id = 'example.container-module'
     ModuleName = 'ExampleContainer'
     ModuleVersion = '0.1.0'
-    ContainerImage = 'ghcr.io/example/example-container:latest'
+    ContainerImage = 'subzerodev-containerpsgenerator-minimal:local'
 
     Commands = @(
         @{

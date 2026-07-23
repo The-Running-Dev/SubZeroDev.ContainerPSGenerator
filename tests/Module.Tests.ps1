@@ -3045,6 +3045,53 @@ Describe 'Maintained repository integration fixtures' {
     }
 }
 
+Describe 'Minimal runnable container example' {
+    BeforeAll {
+        $exampleRoot = Join-Path $PSScriptRoot '..' 'examples' 'Minimal'
+        $specificationPath = Join-Path $exampleRoot 'PSModule' 'PSModule.psd1'
+    }
+
+    It 'contains parseable host and container entry-point scripts' {
+        foreach ($scriptName in @('Run-Example.ps1', 'Invoke-ExampleContainer.ps1')) {
+            $tokens = $null
+            $parseErrors = $null
+            $null = [Management.Automation.Language.Parser]::ParseFile(
+                (Join-Path $exampleRoot $scriptName),
+                [ref] $tokens,
+                [ref] $parseErrors
+            )
+
+            $parseErrors | Should -BeNullOrEmpty
+        }
+    }
+
+    It 'uses one image identity across generation, packaging, and the lifecycle runner' {
+        $model = Get-ContainerModuleModel -Specification $specificationPath
+        $dockerfile = Get-Content -LiteralPath (Join-Path $exampleRoot 'Dockerfile') -Raw
+        $runnerTokens = $null
+        $runnerErrors = $null
+        $runnerAst = [Management.Automation.Language.Parser]::ParseFile(
+            (Join-Path $exampleRoot 'Run-Example.ps1'),
+            [ref] $runnerTokens,
+            [ref] $runnerErrors
+        )
+        $runnerCommands = @($runnerAst.FindAll({
+            param ($node)
+            $node -is [Management.Automation.Language.CommandAst]
+        }, $true).GetCommandName())
+
+        $model.ContainerImage | Should -Be 'subzerodev-containerpsgenerator-minimal:local'
+        $dockerfile | Should -Match 'COPY artifacts/PSModule /PSModule'
+        $runnerCommands | Should -Contain 'Build-ContainerModule'
+        $runnerCommands | Should -Contain 'Install-ContainerModule'
+        $runnerCommands | Should -Contain 'Import-Module'
+        $runnerCommands | Should -Contain 'Invoke-Example'
+        $runnerCommands | Should -Contain 'Get-Help'
+        $runnerCommands | Should -Contain 'Remove-Module'
+        $runnerCommands | Should -Contain 'Remove-Item'
+    }
+}
+
 Describe 'Discovered PowerShell source execution' {
     It 'invokes a discovered script with its bound parameters instead of Docker' {
         $repositoryPath = Join-Path $TestDrive 'source-repository'
