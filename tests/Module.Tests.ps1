@@ -2181,9 +2181,10 @@ param([string] $Name)
         Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
         $firstSnapshot = & $getPackageSnapshot $outputPath
         $firstPaths = @(
-            (Get-ChildItem -LiteralPath $outputPath -File -Recurse).ForEach({
-                [IO.Path]::GetRelativePath($outputPath, $_.FullName) -replace '\\', '/'
-            })
+            Get-ChildItem -LiteralPath $outputPath -File -Recurse |
+                ForEach-Object {
+                    [IO.Path]::GetRelativePath($outputPath, $_.FullName) -replace '\\', '/'
+                }
         )
 
         Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
