@@ -12,6 +12,8 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
         $exportedCommands = Get-Command -Module SubZeroDev.ContainerPSGenerator
 
         $exportedCommands.Name | Should -Contain 'Build-ContainerModule'
+        $exportedCommands.Name | Should -Contain 'Get-ContainerModuleDiagnostic'
+        $exportedCommands.Name | Should -Contain 'Get-ContainerModuleInspection'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModuleModel'
         $exportedCommands.Name | Should -Contain 'Get-ContainerModulePlugin'
         $exportedCommands.Name | Should -Contain 'Install-ContainerModule'
@@ -25,6 +27,53 @@ Describe 'SubZeroDev.ContainerPSGenerator module' {
             Should -Not -BeNullOrEmpty
         $command.Parameters.Output.Attributes.Where({ $_ -is [System.Management.Automation.ParameterAttribute] }) |
             Should -Not -BeNullOrEmpty
+    }
+}
+
+Describe 'Container module inspection diagnostics' {
+    BeforeEach {
+        $repositoryPath = Join-Path $TestDrive 'DiagnosticRepository'
+        $specificationDirectory = Join-Path $repositoryPath 'PSModule'
+        New-Item -Path $specificationDirectory -ItemType Directory -Force | Out-Null
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value '@{ Commands = @() }'
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'Dockerfile') -Value 'FROM alpine:3.20'
+    }
+
+    It 'returns typed inspection data without creating build output' {
+        $result = Get-ContainerModuleInspection -Specification $specificationPath
+
+        $result.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.InspectionResult'
+        $result.RepositoryPath | Should -Be $repositoryPath
+        $result.Data.Dockerfiles[0].Stages[0].Image | Should -Be 'alpine:3.20'
+        $result.PluginExecutions.Count | Should -BeGreaterThan 0
+        Test-Path -LiteralPath (Join-Path $specificationDirectory '.container-module-inspection') |
+            Should -BeFalse
+    }
+
+    It 'returns ordered typed diagnostics from an inspection result' {
+        $inspection = Get-ContainerModuleInspection -Specification $specificationPath
+
+        $diagnostics = @($inspection | Get-ContainerModuleDiagnostic)
+
+        $diagnostics.Count | Should -Be $inspection.PluginExecutions.Count
+        $diagnostics[0].PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Diagnostic'
+        $diagnostics.Plugin | Should -Be $inspection.PluginExecutions.Plugin
+        $diagnostics.ExecutionOrder | Should -Be @(0..($diagnostics.Count - 1))
+        $diagnostics.Succeeded | Should -Not -Contain $false
+        $diagnostics.DurationMilliseconds | ForEach-Object { $_ | Should -BeGreaterOrEqual 0 }
+    }
+
+    It 'can run diagnostics directly from a specification' {
+        $diagnostics = @(Get-ContainerModuleDiagnostic -Specification $specificationPath)
+
+        $diagnostics.Plugin | Should -Contain 'DockerfileInspector'
+        $diagnostics.Stage | Should -Not -Contain 'Validators'
+    }
+
+    It 'rejects an unrelated diagnostic input object' {
+        { [pscustomobject]@{} | Get-ContainerModuleDiagnostic } |
+            Should -Throw -ExceptionType ([System.ArgumentException]) -ExpectedMessage '*Get-ContainerModuleInspection*'
     }
 }
 

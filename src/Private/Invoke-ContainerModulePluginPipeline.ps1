@@ -47,6 +47,7 @@ function Invoke-ContainerModulePluginPipeline {
         $execution = [pscustomobject]@{
             PSTypeName = 'SubZeroDev.ContainerPSGenerator.PluginExecution'
             Stage      = $plugin.Stage
+            ExecutionOrder = $plugin.ExecutionOrder
             Plugin     = $plugin.Name
             Path       = $plugin.Path
             StartedAt  = $startedAt
