@@ -1,13 +1,13 @@
 BeforeAll {
     $repositoryRoot = Split-Path $PSScriptRoot -Parent
     $generatorManifest = Join-Path $repositoryRoot 'src' 'SubZeroDev.ContainerPSGenerator.psd1'
-    $fixtureSource = Join-Path $repositoryRoot 'examples' 'EndToEnd'
-    $fixturePath = Join-Path $TestDrive 'EndToEnd'
+    $fixtureSource = Join-Path $repositoryRoot 'examples' 'Minimal'
+    $fixturePath = Join-Path $TestDrive 'Minimal'
     $generatedModulePath = Join-Path $fixturePath 'artifacts' 'PSModule'
-    $installedModulePath = Join-Path $TestDrive 'Installed' 'ContainerE2E'
+    $installedModulePath = Join-Path $TestDrive 'Installed' 'ExampleContainer'
     $isAct = $env:ACT -eq 'true'
     $mountedRepositoryPath = if ($isAct) { '/tmp' } else { Join-Path $TestDrive 'Repository' }
-    $image = 'subzerodev-containerpsgenerator-e2e:local'
+    $image = 'subzerodev-containerpsgenerator-minimal:local'
 
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
         throw 'Docker is required for the container end-to-end tests.'
@@ -34,54 +34,51 @@ BeforeAll {
     }
 
     $null = Install-ContainerModule $image -Destination $installedModulePath
-    Import-Module (Join-Path $installedModulePath 'ContainerE2E.psd1') -Force
+    Import-Module (Join-Path $installedModulePath 'ExampleContainer.psd1') -Force
 
     if (-not $isAct) {
         $null = New-Item -Path $mountedRepositoryPath -ItemType Directory -Force
-        Set-Content -LiteralPath (Join-Path $mountedRepositoryPath 'sentinel.txt') -Value 'mounted-content' -NoNewline
+        Set-Content -LiteralPath (Join-Path $mountedRepositoryPath 'README.md') `
+            -Value 'mounted-content' -NoNewline
     }
 }
 
 AfterAll {
-    Remove-Module ContainerE2E -Force -ErrorAction SilentlyContinue
+    Remove-Module ExampleContainer -Force -ErrorAction SilentlyContinue
     Remove-Module SubZeroDev.ContainerPSGenerator -Force -ErrorAction SilentlyContinue
     & docker image rm --force $image 2>&1 | Out-Null
 }
 
 Describe 'Container module end-to-end workflow' {
     It 'embeds and installs the generated module from /PSModule' {
-        Test-Path -LiteralPath (Join-Path $installedModulePath 'ContainerE2E.psd1') -PathType Leaf |
+        Test-Path -LiteralPath (Join-Path $installedModulePath 'ExampleContainer.psd1') -PathType Leaf |
             Should -BeTrue
-        Get-Command Invoke-ContainerE2E -Module ContainerE2E | Should -Not -BeNullOrEmpty
+        Get-Command Invoke-Example -Module ExampleContainer | Should -Not -BeNullOrEmpty
     }
 
     It 'runs the generated command through Docker with arguments, environment, and a mount' {
-        $result = Invoke-ContainerE2E `
-            -Message 'hello-from-e2e' `
-            -EnvironmentValue 'environment-from-e2e' `
-            -Repository (Get-Item -LiteralPath $mountedRepositoryPath) |
+        $result = Invoke-Example `
+            -Repository (Get-Item -LiteralPath $mountedRepositoryPath) `
+            -Message 'hello-from-e2e' |
             ConvertFrom-Json
 
         $result.Message | Should -Be 'hello-from-e2e'
-        $result.EnvironmentValue | Should -Be 'environment-from-e2e'
+        $result.EnvironmentMessage | Should -Be 'hello-from-e2e'
         if ($isAct) {
-            $result.MountedFileExists | Should -BeFalse
-            $result.MountedFileContent | Should -BeNullOrEmpty
+            $result.MountedReadme | Should -BeFalse
         }
         else {
-            $result.MountedFileExists | Should -BeTrue
-            $result.MountedFileContent | Should -Be 'mounted-content'
+            $result.MountedReadme | Should -BeTrue
         }
     }
 
     It 'provides generated help and previews without running Docker' {
-        (Get-Help Invoke-ContainerE2E).Synopsis | Should -Be 'Runs the end-to-end fixture container.'
+        (Get-Help Invoke-Example).Synopsis | Should -Be 'Runs the example container.'
 
         $previewResult = @(
-            Invoke-ContainerE2E `
-                -Message 'preview' `
-                -EnvironmentValue 'preview-environment' `
+            Invoke-Example `
                 -Repository (Get-Item -LiteralPath $mountedRepositoryPath) `
+                -Message 'preview' `
                 -WhatIf
         )
 
