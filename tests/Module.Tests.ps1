@@ -75,6 +75,73 @@ Describe 'Get-ContainerModulePlugin' {
     }
 }
 
+Describe 'Container module plugin pipeline' {
+    BeforeEach {
+        $pluginRoot = Join-Path $TestDrive 'PipelinePlugins'
+        if (Test-Path -LiteralPath $pluginRoot) {
+            Remove-Item -LiteralPath $pluginRoot -Recurse -Force
+        }
+        New-Item -Path (Join-Path $pluginRoot 'Inspectors') -ItemType Directory -Force | Out-Null
+        New-Item -Path (Join-Path $pluginRoot 'Validators') -ItemType Directory -Force | Out-Null
+    }
+
+    It 'invokes plugins in stage and lexical order against a shared context' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '10.Second.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('second')
+'@
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.First.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('first')
+'@
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Validators' '00.Validate.ps1') -Value @'
+param ([psobject] $Context)
+$Context.Trace.Add('validate')
+'@
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            $context = [pscustomobject]@{ Trace = [System.Collections.Generic.List[string]]::new() }
+
+            $result = Invoke-ContainerModulePluginPipeline -Context $context -Path $PluginRoot
+
+            [object]::ReferenceEquals($result, $context) | Should -BeTrue
+            $context.Trace | Should -Be @('first', 'second', 'validate')
+            $context.PluginExecutions.Plugin | Should -Be @('First', 'Second', 'Validate')
+            $context.PluginExecutions.Succeeded | Should -Not -Contain $false
+            $context.PluginExecutions.Duration | ForEach-Object { $_ | Should -BeOfType ([TimeSpan]) }
+        }
+    }
+
+    It 'requires plugins to declare the shared context contract' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.Invalid.ps1') -Value "'no context'"
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            { Invoke-ContainerModulePluginPipeline -Context ([pscustomobject]@{}) -Path $PluginRoot } |
+                Should -Throw -ExceptionType ([System.IO.InvalidDataException]) -ExpectedMessage "*declare a 'Context' parameter*"
+        }
+    }
+
+    It 'records and identifies a failed plugin' {
+        Set-Content -LiteralPath (Join-Path $pluginRoot 'Inspectors' '00.Fail.ps1') -Value @'
+param ([psobject] $Context)
+throw 'inspection failed'
+'@
+
+        InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{ PluginRoot = $pluginRoot } {
+            param ($PluginRoot)
+            $context = [pscustomobject]@{}
+
+            { Invoke-ContainerModulePluginPipeline -Context $context -Path $PluginRoot } |
+                Should -Throw -ExceptionType ([System.InvalidOperationException]) -ExpectedMessage "*Plugin 'Fail' in stage 'Inspectors' failed*"
+            $context.PluginExecutions.Count | Should -Be 1
+            $context.PluginExecutions[0].Succeeded | Should -BeFalse
+            $context.PluginExecutions[0].Error | Should -Be 'inspection failed'
+        }
+    }
+}
+
 Describe 'Test-ContainerModuleSpecification' {
     It 'returns true for a valid specification' {
         $specificationPath = Join-Path $TestDrive 'Valid.psd1'

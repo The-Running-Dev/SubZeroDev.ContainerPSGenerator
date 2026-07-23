@@ -22,5 +22,6 @@ function New-ContainerModuleBuildContext {
         OutputPath        = $resolvedOutputPath
         Specification     = $specification
         Model             = $null
+        PluginExecutions  = [System.Collections.Generic.List[object]]::new()
     }
 }

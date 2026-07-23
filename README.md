@@ -26,14 +26,14 @@ The current implementation supports the complete basic workflow from a repositor
 - Render native `ValidateSet`, `ValidateRange`, and `ValidatePattern` parameter attributes.
 - Render static native PowerShell argument completion without restricting accepted values.
 - Generate comment-based help and deterministic Markdown command references from synopsis, descriptions, parameter help, examples, and notes.
-- Discover pipeline plugins from the seven supported stage directories and report them in deterministic pipeline and lexical filename order.
+- Discover pipeline plugins from the seven supported stage directories, invoke their shared-context contract in deterministic order, and retain per-plugin execution diagnostics.
 - Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
 - Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
 
-Still planned for Version 1 are plugin execution/orchestration, initial repository inspectors, richer diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+Still planned for Version 1 are connecting plugin stages to `Build-ContainerModule`, initial repository inspectors, richer user-facing diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
 ## How it is intended to work
 
@@ -109,6 +109,8 @@ Get-ContainerModulePlugin -Path ./PSModule/Plugins -Stage Inspectors, Validators
 ```
 
 Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `CodeGenerators`, `TemplateRenderers`, `RuntimeAdapters`, and `PackagingProviders` directories. Plugin filenames must follow the `<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`.
+
+The internal pipeline runner invokes each plugin with a shared `Context` parameter and records its stage, path, timing, success, and any error. Integration with `Build-ContainerModule` is the next implementation slice; the public plugin SDK remains deferred to Phase 2.
 
 Install a generated module embedded at `/PSModule` in a container image:
 
