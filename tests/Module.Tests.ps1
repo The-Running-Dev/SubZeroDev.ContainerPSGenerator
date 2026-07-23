@@ -474,6 +474,61 @@ Describe 'Project manifest inspection' {
     }
 }
 
+Describe 'README inspection' {
+    BeforeEach {
+        foreach ($name in @('README.md', 'README.markdown', 'README.txt', 'README')) {
+            Remove-Item -LiteralPath (Join-Path $TestDrive $name) -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists ordered README headings and fenced-code languages' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'README.md') -Value @'
+# Example Tool
+
+## Install
+
+```powershell
+Install-Module Example
+# Not a heading
+```
+
+### Usage
+
+~~~
+unlabelled
+~~~
+'@
+        Set-Content -LiteralPath (Join-Path $TestDrive 'README.txt') -Value "Plain text title`nDetails"
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $metadata.Inspection.Readmes.Path | Should -Be @('README.md', 'README.txt')
+        $markdown = $metadata.Inspection.Readmes[0]
+        $markdown.Title | Should -Be 'Example Tool'
+        $markdown.Headings.Level | Should -Be @(1, 2, 3)
+        $markdown.Headings.Text | Should -Be @('Example Tool', 'Install', 'Usage')
+        $markdown.CodeLanguages[0] | Should -Be 'powershell'
+        $markdown.CodeLanguages.Count | Should -Be 2
+        $null -eq $markdown.CodeLanguages[1] | Should -BeTrue
+        $metadata.Inspection.Readmes[1].Title | Should -Be 'Plain text title'
+    }
+
+    It 'persists an empty collection when no root README exists' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.Readmes).Count | Should -Be 0
+    }
+}
+
 Describe 'Build-ContainerModule command validation' {
     BeforeEach {
         Push-Location $TestDrive

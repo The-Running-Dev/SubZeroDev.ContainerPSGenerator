@@ -30,6 +30,7 @@ The current implementation supports the complete basic workflow from a repositor
 - Inspect root-level Dockerfile variants and persist ordered build-stage image, alias, and platform metadata.
 - Inspect root-level Docker Compose files and persist ordered service image, build context, Dockerfile, and port metadata.
 - Inspect .NET and Node project manifests while excluding generated and dependency directories.
+- Inspect root README title, heading hierarchy, and fenced-code language metadata.
 - Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
 - Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
