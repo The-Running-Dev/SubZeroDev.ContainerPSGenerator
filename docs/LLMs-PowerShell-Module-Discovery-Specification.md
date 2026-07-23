@@ -1,253 +1,286 @@
-# LLMs PowerShell Module Discovery Specification
+# LLMs Discoverable PowerShell Interface Specification
 
 ## Purpose
 
-Use this specification as an implementation prompt for reorganizing the
-`The-Running-Dev/LLMs` repository. The goal is to make its intended PowerShell
-interface discoverable by `SubZeroDev.ContainerPSGenerator` through simple
-Version 1 conventions.
+Use this document as an implementation prompt for
+`The-Running-Dev/LLMs`. It describes the smallest repository change needed to
+give `SubZeroDev.ContainerPSGenerator` an unambiguous PowerShell interface to
+discover.
 
-This is a structure-and-metadata change. Do not redesign the setup workflow,
-change installer behavior, or expose infrastructure scripts as public commands.
+This specification is based on the complete documentation set in the pinned
+LLMs checkout, including the root documentation, `setup/docs`, repository
+instructions and roadmap, and the nested `docs-template` documentation.
 
-## Current repository inventory
+The work must preserve the existing setup architecture. It is not a rewrite of
+the provisioning or project-generation implementation.
 
-The repository currently contains three distinct kinds of PowerShell code.
+## Documented product boundary
 
-### Existing public module
+The root `README.md` is the canonical documentation source. It identifies two
+primary PowerShell workflows:
 
-`setup/modules/ProjectSetup.psm1` explicitly exports these functions:
+1. `setup/setup.ps1` performs one-time, cross-platform workstation setup.
+2. `setup/setup-project.ps1` scaffolds a new AI-assisted project.
 
-- `New-ProjectStructure`
-- `New-ProjectFile`
-- `New-Gitignore`
-- `New-EnvExample`
-- `New-ReadmeFile`
-- `New-ArchitectureFile`
-- `New-AdtTemplate`
-- `New-ClaudeInstructions`
-- `New-AgentsInstructions`
-- `Initialize-ProjectGit`
-- `Invoke-LanguageStarter`
-- `Test-ProjectBuildable`
-- `Test-ProjectTestable`
-- `New-ProjectInitialCommit`
+The container exposes three entrypoint modes:
 
-These exports are the authoritative public API of the existing module.
+- `docs` serves the generated documentation on port 8080.
+- `setup` forwards arguments to `setup/setup.ps1`.
+- `pwsh` starts PowerShell for inspection or explicit script execution.
 
-`setup/modules/Common.ps1` contains shared implementation helpers. Its
-functions are private and must not be exported.
+The generated PowerShell interface should represent the two documented
+workflows. It must not treat every implementation script or exported helper
+function as an end-user command.
 
-### Independently runnable component scripts
+## Existing implementation boundary
 
-These scripts are beneath a directory named `scripts` and are candidates for
-standalone discovery:
+The current implementation is intentionally layered:
 
-```text
-setup/scripts/starters/setup-starter-node.ps1
-setup/scripts/starters/setup-starter-python.ps1
-setup/scripts/workstation/install-claude-mem.ps1
-setup/scripts/workstation/install-claude-memory.ps1
-setup/scripts/workstation/install-database-mcp.ps1
-setup/scripts/workstation/install-filesystem-mcp.ps1
-setup/scripts/workstation/install-github-mcp.ps1
-setup/scripts/workstation/install-graphify.ps1
-setup/scripts/workstation/install-playwright-mcp.ps1
-```
+- `setup/setup.ps1` detects the operating system and dispatches workstation
+  setup.
+- `setup/setup-windows.ps1`, `setup/setup-macos.ps1`, and
+  `setup/setup-ubuntu.ps1` install platform prerequisites.
+- `setup/setup-workstation.ps1` coordinates shared integrations.
+- `setup/scripts/workstation/install-*.ps1` are focused implementation
+  components called by the workstation orchestrator.
+- `setup/setup-project.ps1` is the documented project-creation orchestrator.
+- `setup/modules/ProjectSetup.psm1` contains project-generation implementation
+  functions called by `setup/setup-project.ps1`.
+- `setup/modules/Common.ps1` contains private shared helpers.
+- `setup/scripts/starters/setup-starter-*.ps1` are language-extension
+  components called by `ProjectSetup.psm1`.
+- `setup/setup-docs.ps1`, `setup/docs-local.ps1`, and
+  `setup/docs-workflow-local.ps1` support the documentation pipeline.
+- `container-entrypoint.ps1` is container infrastructure.
 
-All nine scripts currently parse successfully as PowerShell.
+These files must retain their current roles and paths unless a compatibility
+wrapper is added.
 
-### Orchestration and infrastructure scripts
+## Files that must not become discovered public commands
 
-The following are not standalone public module commands:
+Do not expose these implementation categories:
 
 - `container-entrypoint.ps1`
-- `setup/setup.ps1`
-- `setup/setup-workstation.ps1`
-- `setup/setup-windows.ps1`
-- `setup/setup-ubuntu.ps1`
-- `setup/setup-macos.ps1`
-- `setup/setup-docs.ps1`
-- `setup/setup-project.ps1`
-- `setup/docs-local.ps1`
-- `setup/docs-workflow-local.ps1`
+- platform scripts such as `setup-windows.ps1`
+- `setup-workstation.ps1`
+- `install-*.ps1` component scripts
+- `setup-starter-*.ps1` language extensions
+- documentation build scripts
+- functions from `Common.ps1`
+- the 14 implementation functions exported by `ProjectSetup.psm1`
+- any PowerShell file in the `docs-template` submodule
 
-They coordinate other components, select a platform, build documentation, or
-implement the container entrypoint. Keep them outside directories named
-`scripts` and do not export them from the module manifest.
+`ProjectSetup.psm1` uses `Export-ModuleMember` so its orchestrator can call a
+defined implementation API. That technical export list is not the documented
+end-user interface and must not be promoted automatically into the generated
+container module.
 
-## Required target structure
+## Required discoverable structure
 
-Keep the existing source locations. Add a module manifest beside the existing
-module:
+Add a small facade module at the repository root:
 
 ```text
-setup/
-├── modules/
-│   ├── Common.ps1
-│   ├── ProjectSetup.psm1
-│   └── ProjectSetup.psd1
-├── scripts/
-│   ├── starters/
-│   │   ├── setup-starter-node.ps1
-│   │   └── setup-starter-python.ps1
-│   └── workstation/
-│       └── install-*.ps1
-└── setup*.ps1
+PowerShell/
+├── LLMs.psd1
+├── LLMs.psm1
+├── Public/
+│   ├── Initialize-LlmWorkspace.ps1
+│   └── New-LlmProject.ps1
+└── Private/
+    └── (optional facade-only helpers)
 ```
 
-Do not move `container-entrypoint.ps1` or any `setup/setup*.ps1` file into
-`setup/scripts`.
+Do not move the existing `setup` implementation into this directory. The facade
+must delegate to the existing scripts so there remains one implementation of
+each workflow.
 
-## ProjectSetup manifest requirements
+## Public command 1: `Initialize-LlmWorkspace`
 
-Create `setup/modules/ProjectSetup.psd1` with:
+This command represents the documented `setup/setup.ps1` workflow.
 
-- `RootModule = 'ProjectSetup.psm1'`
+It must expose the current setup parameters:
+
+- `Client` with `Codex`, `ClaudeCode`, and `Both`
+- `SkipClaudeMem`
+- `SkipGitHub`
+- `SkipPlaywright`
+- `SkipGraphify`
+- `IncludeFilesystem`
+- `FilesystemPath`
+- `IncludeDatabase`
+- `DatabaseName`
+- `DatabaseCommand`
+- `DatabaseArgument`
+
+Requirements:
+
+- Use `[CmdletBinding(SupportsShouldProcess)]`.
+- Preserve the existing defaults and validation.
+- Include complete comment-based help based on the canonical README and setup
+  specification.
+- Delegate to `setup/setup.ps1`; do not duplicate platform detection or
+  installer logic.
+- Preserve the current `-WhatIf` behavior.
+- Explain in help that container execution changes the container environment
+  unless configuration paths are persisted.
+- Document the Docker-socket security boundary for Docker-based integrations.
+
+## Public command 2: `New-LlmProject`
+
+This command represents the documented `setup/setup-project.ps1` workflow.
+
+It must expose the current project parameters:
+
+- `ProjectPath`
+- `ProjectName`
+- `Language`
+- `Client`
+- `GitUserName`
+- `GitUserEmail`
+- `SkipGit`
+- `SkipLanguageStarter`
+- `SkipValidation`
+- `AutoCommit`
+
+Requirements:
+
+- Use `[CmdletBinding(SupportsShouldProcess)]`.
+- Preserve mandatory fields, defaults, and `ValidateSet` values.
+- Include complete comment-based help based on the quick start, new-project
+  guide, setup specification, modular architecture, and language-starter
+  reference.
+- Delegate to `setup/setup-project.ps1`.
+- Preserve the current project layout and generated files.
+- Preserve `-WhatIf`.
+- Do not claim validation or auto-commit behavior that the implementation does
+  not actually guarantee. The current roadmap records correctness issues in
+  build/test exit handling and auto-commit gating; either fix those issues first
+  or document the actual behavior accurately.
+
+## Facade module manifest
+
+Create `PowerShell/LLMs.psd1` with:
+
+- `RootModule = 'LLMs.psm1'`
 - a valid semantic `ModuleVersion`
 - a stable `GUID`
 - non-empty `Author`, `CompanyName`, `Description`, and `PowerShellVersion`
-- `FunctionsToExport` containing exactly the 14 functions already passed to
-  `Export-ModuleMember`
+- `FunctionsToExport` containing exactly:
+  - `Initialize-LlmWorkspace`
+  - `New-LlmProject`
 - `CmdletsToExport = @()`
 - `VariablesToExport = @()`
 - `AliasesToExport = @()`
-- useful `PrivateData.PSData` fields when repository URLs and tags are known
+- repository URL, project URL, license URL, and useful tags under
+  `PrivateData.PSData` when known
 
-The manifest must not export wildcard functions.
+Do not use wildcard exports.
 
-The export list in `ProjectSetup.psd1` and the list passed to
-`Export-ModuleMember` in `ProjectSetup.psm1` must match exactly.
+`PowerShell/LLMs.psm1` should dot-source only files under `PowerShell/Public` and
+facade-specific helpers under `PowerShell/Private`. It must not recursively
+dot-source all files beneath `setup`.
 
-`Common.ps1` remains private implementation. Do not add it to
-`FunctionsToExport`, and do not turn its helper functions into public commands.
+## Existing `ProjectSetup` module
 
-## Standalone script requirements
+The existing module may receive a sibling
+`setup/modules/ProjectSetup.psd1` for correctness and direct development use,
+but it is not the container module facade.
 
-Every `.ps1` file beneath `setup/scripts` is treated as independently runnable.
-For each script:
+If that manifest is added:
 
-1. It must parse without errors under supported PowerShell versions.
-2. It must declare a script-level `param` block.
-3. It should use `[CmdletBinding()]`; use
-   `[CmdletBinding(SupportsShouldProcess)]` when it changes machine or repository
-   state.
-4. It must contain comment-based help with at least:
-   - `.SYNOPSIS`
-   - `.DESCRIPTION`
-   - one `.PARAMETER` entry for every declared parameter
-   - at least one `.EXAMPLE`
-5. Parameters must use explicit PowerShell types.
-6. Mandatory parameters must use `[Parameter(Mandatory)]`.
-7. Closed sets must use `ValidateSet` where practical.
-8. A script must not rely on being dot-sourced by its caller.
-9. Shared implementation belongs in `setup/modules/Common.ps1` or another
-   private module, not in duplicated script-local helper functions.
+- its `FunctionsToExport` must exactly match the existing literal
+  `Export-ModuleMember` list;
+- `Common.ps1` helpers must remain private;
+- existing imports from `setup/setup-project.ps1` must continue to work;
+- discovery metadata must identify it as an internal implementation module.
 
-Do not rename scripts merely to manufacture PowerShell `Verb-Noun` filenames.
-The discovery tool is responsible for deriving a valid generated command name
-from the path and filename. The source path remains the stable identity.
+Adding this internal manifest is optional for the facade task.
 
-## Discovery contract
+## Documentation ownership
 
-The repository should be compatible with this simple discovery behavior:
+- The root `README.md` remains canonical.
+- `setup/docs` remains the authored detailed documentation set.
+- `setup/docs/index.md` remains a placeholder replaced from the root README.
+- `docs-template` remains a pinned Docusaurus template and generated
+  synchronization target.
+- Do not edit generated files in `docs-template`.
+- If the facade is documented, update the canonical README and an appropriate
+  authored page under `setup/docs`; let `setup/setup-docs.ps1` synchronize the
+  template.
 
-1. Find `.psm1` files beneath directories named `modules`.
-2. If a sibling `.psd1` exists, treat `FunctionsToExport` as the public API.
-3. Otherwise, fall back to a literal `Export-ModuleMember -Function` list.
-4. Find `.ps1` files beneath directories named `scripts`.
-5. Inspect their script-level parameters and comment-based help without
-   executing or importing repository code.
-6. Ignore helper `.ps1` files beneath `modules`.
-7. Ignore `.ps1` files outside `scripts`, including container entrypoints and
-   setup orchestrators.
-8. Do not recurse into `.git`, generated output, dependency directories, or Git
-   submodules such as `docs-template`.
+## Discovery contract for ContainerPSGenerator
 
-The scanner must not infer public commands from every function definition in a
-module. Only explicit exports are public.
+ContainerPSGenerator should be able to:
 
-## Compatibility constraints
+1. Locate `PowerShell/LLMs.psd1`.
+2. Read `RootModule` and the literal `FunctionsToExport` list without importing
+   the module.
+3. Parse the two files under `PowerShell/Public`.
+4. Extract command names, parameter metadata, validation, help, examples, and
+   `SupportsShouldProcess` from PowerShell AST.
+5. Ignore `PowerShell/Private`.
+6. Ignore the separate implementation tree under `setup`.
+7. Ignore `docs-template` as a Git submodule.
+8. Perform discovery without running setup, installers, project generation,
+   Docker, package managers, or documentation synchronization.
 
-- Preserve all existing script paths used by `setup/setup-workstation.ps1` and
-  `ProjectSetup.psm1`.
-- Preserve all existing function names and parameter contracts.
-- Preserve Windows, Linux, and macOS setup dispatch.
-- Preserve `SupportsShouldProcess` and current `-WhatIf` behavior.
-- Do not execute installers, initialize Git repositories, modify user
-  configuration, or start containers during validation.
-- Do not add secrets, tokens, `.env` contents, or machine-specific paths.
-- Do not modify the `docs-template` submodule.
+The manifest is the authoritative public boundary. File presence elsewhere in
+the repository is not sufficient to make a command public.
 
-## Validation commands
+## Compatibility and security constraints
 
-Run these checks from the LLMs repository root:
+- Preserve documented Windows, macOS, and Ubuntu/Debian behavior.
+- Preserve Windows PowerShell 5.1 compatibility where the existing setup
+  workflow claims it, unless the project intentionally changes that support
+  policy.
+- Preserve all existing script paths used by orchestrators.
+- Do not duplicate setup logic in the facade.
+- Do not initialize Git repositories, install packages, register MCP servers,
+  modify user configuration, or start containers during discovery or tests.
+- Do not add tokens, `.env` contents, credentials, or machine-specific paths.
+- Keep Filesystem MCP disabled by default.
+- Preserve GitHub MCP's read-only default and explicit toolset allow-list.
+- Treat Docker-socket access as privileged host access and document it.
 
-```powershell
-$errors = @()
-Get-ChildItem ./setup/scripts -Recurse -File -Filter *.ps1 | ForEach-Object {
-    $tokens = $null
-    $parseErrors = $null
-    [void][System.Management.Automation.Language.Parser]::ParseFile(
-        $_.FullName,
-        [ref]$tokens,
-        [ref]$parseErrors
-    )
-    $errors += $parseErrors
-}
-if ($errors.Count -gt 0) { throw ($errors | Out-String) }
+## Validation
 
-$module = Test-ModuleManifest ./setup/modules/ProjectSetup.psd1 -ErrorAction Stop
-Import-Module ./setup/modules/ProjectSetup.psd1 -Force
+Add non-invasive tests that:
 
-$expected = @(
-    'New-ProjectStructure'
-    'New-ProjectFile'
-    'New-Gitignore'
-    'New-EnvExample'
-    'New-ReadmeFile'
-    'New-ArchitectureFile'
-    'New-AdtTemplate'
-    'New-ClaudeInstructions'
-    'New-AgentsInstructions'
-    'Initialize-ProjectGit'
-    'Invoke-LanguageStarter'
-    'Test-ProjectBuildable'
-    'Test-ProjectTestable'
-    'New-ProjectInitialCommit'
-) | Sort-Object
-
-$actual = Get-Command -Module $module.Name |
-    Where-Object CommandType -eq Function |
-    Select-Object -ExpandProperty Name |
-    Sort-Object
-
-if (Compare-Object $expected $actual) {
-    throw 'ProjectSetup module exports do not match the required public API.'
-}
-```
-
-Validation must inspect scripts and module metadata only. It must not invoke any
-setup or installer operation.
+1. Run `Test-ModuleManifest PowerShell/LLMs.psd1`.
+2. Parse every facade `.ps1` file with the PowerShell parser and require zero
+   parse errors.
+3. Compare `FunctionsToExport` with the two public facade filenames.
+4. Import the facade module without invoking either command.
+5. Confirm exactly `Initialize-LlmWorkspace` and `New-LlmProject` are exported.
+6. Confirm `Common.ps1`, `ProjectSetup.psm1` functions, platform scripts,
+   installers, starters, documentation scripts, and `container-entrypoint.ps1`
+   are not exported.
+7. Exercise command binding and `-WhatIf` only with mocks or a non-invasive
+   delegation seam.
+8. Confirm no file in `docs-template` changed.
 
 ## Acceptance criteria
 
-- `setup/modules/ProjectSetup.psd1` exists and passes `Test-ModuleManifest`.
-- Importing the manifest exports exactly the existing 14 public functions.
-- `Common.ps1` helpers remain private.
-- Every script under `setup/scripts` has a parseable script-level parameter
-  block and complete comment-based help.
-- Orchestration and container infrastructure scripts remain outside
-  `setup/scripts`.
-- Existing setup commands and paths continue to work.
-- No installer or setup action is executed by validation.
-- No files inside the `docs-template` submodule are changed.
+- `PowerShell/LLMs.psd1` and `PowerShell/LLMs.psm1` exist.
+- Exactly two documented workflow commands are public.
+- Both commands have complete help and preserve source parameter contracts.
+- Both commands delegate to the existing orchestrators.
+- Existing setup and project-generation behavior remains intact.
+- Implementation components remain private.
+- Discovery requires no code execution.
+- Tests perform no installation, registration, project creation, container
+  start, or documentation synchronization.
+- Canonical documentation is updated without directly editing generated
+  `docs-template` content.
 
-## Implementation instruction for an LLM
+## Instruction to the implementing LLM
 
-Inspect the current repository before editing. Apply the smallest changes that
-satisfy this specification. Preserve behavior and paths. Create the
-`ProjectSetup.psd1` manifest, improve missing metadata/help on scripts beneath
-`setup/scripts`, and add non-invasive validation tests. Do not reorganize
-unrelated code, expose private helpers, or execute setup scripts. Report the
-exact files changed and validation results.
+Read the root README, Roadmap, every authored document under `setup/docs`, the
+current setup scripts, `ProjectSetup.psm1`, `Common.ps1`, the Dockerfile, and
+`container-entrypoint.ps1` before editing. Treat the root README as canonical
+and `docs-template` as generated/template-owned.
+
+Implement the smallest facade described here. Do not expose implementation
+components merely because they are scripts or technically exported from an
+internal module. Preserve existing behavior and paths, add non-invasive tests,
+and report exact files changed, commands run, and validation results.
