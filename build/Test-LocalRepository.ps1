@@ -130,6 +130,17 @@ try {
         }
         $generatedManifest = Join-Path ([IO.Path]::GetFullPath($outputPath)) "$($model.ModuleName).psd1"
         $generatedModule = Import-Module $generatedManifest -Force -Global -PassThru -ErrorAction Stop
+        $unmappedSourceCommands = @($model.Commands | Where-Object {
+            $_.Definition.ContainsKey('SourcePath') -and
+            @($_.Parameters | Where-Object { $_.Mappings.Count -gt 0 }).Count -eq 0
+        })
+        if ($unmappedSourceCommands.Count -gt 0) {
+            Write-Warning (
+                "$($unmappedSourceCommands.Count) discovered command(s) have source metadata but no runtime mappings. " +
+                "They currently invoke the container image only; SourcePath does not select a script inside the container. " +
+                "Use -WhatIf to preview or -Verbose to trace the Docker command."
+            )
+        }
         Get-Command -Module $generatedModule.Name | Sort-Object Name
         return
     }

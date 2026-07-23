@@ -1952,12 +1952,15 @@ Describe 'Docker runtime command generation' {
         $global:capturedDockerArguments = $null
         function global:docker { $global:capturedDockerArguments = @($args) }
         try {
-            Invoke-DockerExample -Message 'hello world' -VerboseOutput
+            $verboseOutput = Invoke-DockerExample -Message 'hello world' -VerboseOutput -Verbose 4>&1
 
             $global:capturedDockerArguments | Should -Be @(
                 'run', '--rm', '-e', 'TOOL_MESSAGE=hello world',
                 'ghcr.io/example/tool:latest', '--message', 'hello world', '--verbose'
             )
+            $verboseOutput -join "`n" | Should -Match 'Starting container command: docker run --rm'
+            $verboseOutput -join "`n" | Should -Match 'Docker is attached to this session'
+            $verboseOutput -join "`n" | Should -Match 'Container command finished after .* exit code 0'
         }
         finally {
             Remove-Item -Path Function:\docker -Force

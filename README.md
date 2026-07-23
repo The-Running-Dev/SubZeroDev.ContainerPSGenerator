@@ -282,6 +282,23 @@ The returned command objects include their names and parameter metadata. Because
 generated module is imported globally, you can invoke a listed command immediately
 after the harness returns.
 
+Preview a generated Docker invocation before running it:
+
+```powershell
+Invoke-MyCommand -WhatIf
+```
+
+Trace the exact Docker command, attachment behavior, elapsed time, and exit code:
+
+```powershell
+Invoke-MyCommand -Verbose
+```
+
+`SourcePath` on an inferred command is discovery metadata; it does not automatically
+select or copy that script inside a container. `-ListCommands` warns when discovered
+commands have no runtime mappings. Add mappings and a real `ContainerImage` before
+executing those wrappers; otherwise they run only `docker run --rm <ContainerImage>`.
+
 ### Run the tests
 
 Run the fast test suite directly with Pester:
