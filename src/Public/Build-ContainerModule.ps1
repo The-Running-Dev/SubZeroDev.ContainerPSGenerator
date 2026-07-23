@@ -66,13 +66,16 @@ function Build-ContainerModule {
 
     if ($pluginRoots.Count -gt 0) {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage TemplateRenderers
-        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage PackagingProviders
     }
 
     if (-not $context.Artifacts.Contains('Metadata')) {
         throw [System.InvalidOperationException]::new(
             'The template-renderer stage did not produce the metadata artifact.'
         )
+    }
+
+    if ($pluginRoots.Count -gt 0) {
+        $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage PackagingProviders
     }
 
     return $context.Artifacts['Metadata']
