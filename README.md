@@ -37,6 +37,7 @@ The current implementation supports the complete basic workflow from a repositor
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
+- Build, install, import, and invoke a generated module through a real Linux container in hosted and local CI.
 
 Still planned for Version 1 are richer user-facing diagnostics and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
@@ -216,13 +217,27 @@ Run the fast test suite directly with Pester:
 Invoke-Pester -Path ./tests -Output Detailed
 ```
 
+Run the real Docker end-to-end fixture directly:
+
+```powershell
+$configuration = New-PesterConfiguration
+$configuration.Run.Path = './tests-e2e'
+$configuration.Run.Exit = $true
+$configuration.Output.Verbosity = 'Detailed'
+Invoke-Pester -Configuration $configuration
+```
+
+This generates `ContainerE2E`, embeds it at `/PSModule` in a Linux image, installs and imports it from that image, invokes its generated command with argument/environment/mount mappings, verifies help and `-WhatIf`, and removes the temporary image afterward.
+
 To exercise the GitHub Actions workflow locally, install [Docker](https://docs.docker.com/get-docker/) and [act](https://nektosact.com/installation/index.html), ensure Docker is running, and execute:
 
 ```powershell
 ./build/Invoke-CI.ps1
 ```
 
-The script builds a local act runner image with PowerShell, then runs the `ubuntu-latest` matrix leg from `.github/workflows/test.yml`. The base images are downloaded on the first run; later runs reuse Docker's build cache.
+The script builds a local act runner image with PowerShell, then runs both the `ubuntu-latest` Pester matrix leg and the real `container-e2e` job from `.github/workflows/test.yml`. The base images are downloaded on the first run; later runs reuse Docker's build cache.
+
+Because `act` itself runs inside a container, its nested Docker daemon cannot access test files created inside the runner's private `/tmp` directory. The local CI path therefore validates a shared `/tmp` bind mount, while direct and hosted runs additionally verify the mounted sentinel file and content.
 
 Act uses Linux containers and cannot faithfully reproduce GitHub's hosted Windows runner. Run the direct Pester command on Windows for fast host-platform feedback; GitHub Actions remains authoritative for both the Windows and Ubuntu jobs.
 
