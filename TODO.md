@@ -1,7 +1,9 @@
 # Version 1 roadmap
 
 This roadmap is ordered by dependency and release risk. `Specifications.md` defines
-the intended Version 1 behavior; `README.md` describes what is implemented today.
+the Version 1 behavior contract and remaining boundary; `README.md` describes what
+is implemented today.
+
 Completed implementation history is summarized below instead of occupying the active
 work queue.
 
@@ -30,8 +32,8 @@ work queue.
   build-agent repositories without embedding external source checkouts.
 - [x] Expand `examples/Minimal` into a buildable, runnable container example covering
   generate, build, install, import, invoke, help, and cleanup.
-- [ ] Verify generated Markdown documentation in the packaged module end-to-end.
-- [ ] Reconcile `Specifications.md`, `README.md`, command help, examples, and generated
+- [x] Verify generated Markdown documentation in the packaged module end-to-end.
+- [x] Reconcile `Specifications.md`, `README.md`, command help, examples, and generated
   documentation with the final Version 1 behavior.
 
 ## 2. Release quality gates
@@ -102,7 +104,7 @@ Complete these in order so every inspector follows the same policy:
 - [x] Direct Pester, hosted Windows and Linux CI, local `act`, and the real container
   end-to-end workflow pass.
 - [x] The generator's distributed package is tested from a clean location.
-- [ ] Documentation accurately distinguishes implemented Version 1 behavior from
+- [x] Documentation accurately distinguishes implemented Version 1 behavior from
   Phase 2 plans.
 - [ ] Release quality gates and the clean-run release-candidate workflow pass.
 

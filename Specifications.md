@@ -1,7 +1,9 @@
 # Repository-Generated PowerShell Container Modules
 
-> **Status:** Version 1 Specification (Working Draft)  
-> **Working Title:** Container Module Generator (CMG)  
+> **Status:** Version 1 behavior contract and release roadmap
+>
+> **Working Title:** Container Module Generator (CMG)
+>
 > **Target Platform:** PowerShell 7.4+, Docker
 
 ---
@@ -15,6 +17,21 @@ Instead of exposing Docker commands directly, repositories define a PowerShell-o
 End users install the module directly from the image and interact with the application through ordinary PowerShell commands rather than raw `docker run` invocations.
 
 The repository remains the single source of truth.
+
+---
+
+# Version 1 Boundary
+
+The core Version 1 workflow described here is implemented: specification validation,
+model normalization, repository inspection, deterministic module and Markdown
+generation, Docker command rendering, `/PSModule` packaging, installation, import,
+help, preview, and invocation.
+
+Items explicitly described as remaining Version 1 work are release-hardening tasks,
+not implemented behavior. They are tracked in `TODO.md`. Anything under
+**Deferred to Phase 2** is outside the Version 1 contract. Repository plugins are an
+internal, trusted-code extension mechanism in Version 1; a stable public plugin SDK
+is Phase 2 work.
 
 ---
 
@@ -88,17 +105,16 @@ Build-ContainerModule -Specification ./config/MyModule.psd1
 Default output:
 
 ```text
-artifacts/
-└── PSModule/
-    BuildAgent.psd1
-    BuildAgent.psm1
-
-    Public/
-    Private/
-    Classes/
-    Completions/
-    en-US/
-    Metadata/
+artifacts/PSModule/
+├── <ModuleName>.psd1
+├── <ModuleName>.psm1
+├── Documentation/
+│   └── <CommandName>.md
+├── Metadata/
+│   └── model.json
+├── Public/
+│   └── <CommandName>.ps1
+└── Scripts/                 # only when repository scripts are packaged
 ```
 
 Only required directories are generated.
@@ -145,15 +161,14 @@ Generated modules are self-contained.
 
 They include:
 
-- Public cmdlets
-- Private helper functions
+- A module manifest and loader
+- Public functions
 - Parameter declarations
-- Validation
-- Completion
-- Help
+- Supported validation and static completion attributes
+- Comment-based help and Markdown command references
 - Docker invocation
-- Preview
-- Diagnostics
+- Local packaged-script invocation for inferred PowerShell commands
+- `-WhatIf` preview and verbose timing
 - Error handling
 
 The generated module does not depend on a shared runtime library.
@@ -197,12 +212,14 @@ Pipeline stages include:
 - Inspectors
 - Validators
 - Object Model Processors
+- Runtime Adapters
 - Code Generators
 - Template Renderers
-- Runtime Adapters
 - Packaging Providers
 
-Plugins communicate through the shared object model.
+Plugins receive a shared mutable build context containing the specification,
+inspection data, normalized model, render requests, artifacts, and execution
+diagnostics.
 
 The core engine is responsible for:
 
@@ -217,7 +234,8 @@ The core engine is responsible for:
 
 Plugins are automatically discovered.
 
-Each plugin implements the appropriate plugin contract (interface or equivalent).
+Each plugin is a trusted PowerShell script with a mandatory `Context` parameter.
+Version 1 does not expose a stable plugin interface or sandbox plugin execution.
 
 Execution order is determined by filename prefix.
 
@@ -253,15 +271,17 @@ Inspectors may analyze:
 - OpenAPI
 - Additional technologies
 
-New inspectors are added simply by placing them into the appropriate plugin directory.
+Trusted repository inspectors can be added beneath the conventional
+`PSModule/Plugins/Inspectors` directory or an explicitly selected plugin root. They
+run with the invoking PowerShell process's filesystem, process, network, and
+credential access.
 
-Malformed optional repository artifacts produce actionable warnings and do not stop
-inspection. Inputs explicitly identified as authoritative, including files named
-`*.schema.json`, fail inspection when malformed.
-
-Version 1 documents and tests the supported subset of Compose, GitHub Actions, and
-OpenAPI YAML. Full YAML-language support and a shared YAML dependency are not Version
-1 requirements.
+The current Compose, GitHub Actions, and OpenAPI YAML inspectors intentionally parse
+a limited line-oriented subset without a shared YAML dependency. Documenting that
+subset and applying the final malformed-input policy across every inspector remain
+Version 1 hardening work. The target policy is to warn and continue for malformed
+optional artifacts while failing for explicitly authoritative inputs such as
+`*.schema.json`.
 
 ---
 
@@ -285,7 +305,8 @@ Generated modules execute correctly on all supported platforms.
 
 Windows and Linux are supported Version 1 platforms and are validated in CI. macOS is
 best-effort for Version 1 and is not a required CI platform. PowerShell 7.4 is the
-minimum supported version.
+Version 1 support baseline. Raising every shipped and generated manifest declaration
+to enforce that baseline remains a release quality gate.
 
 The generator handles:
 
@@ -391,6 +412,9 @@ Parameters = @(
 
 The specification uses native PowerShell types.
 
+The generator emits the declared type name directly into generated PowerShell.
+Built-in aliases normalize `switch`, `FileInfo`, and `DirectoryInfo`; other simple or
+namespace-qualified types must resolve when the generated module is imported.
 Examples include:
 
 - string
@@ -410,8 +434,7 @@ Examples include:
 - DirectoryInfo
 - SecureString
 - PSCredential
-- Enumerations
-- Custom classes
+- Existing enumeration types
 
 No custom type system is introduced.
 
@@ -419,20 +442,8 @@ No custom type system is introduced.
 
 # Validation
 
-Native PowerShell validation attributes are preferred.
-
-Examples include:
-
-- ValidateSet
-- ValidateRange
-- ValidateLength
-- ValidatePattern
-- ValidateCount
-- ValidateScript
-
-Custom validation is implemented through validator plugins.
-
-Version 1 supports declarative `ValidateSet`, `ValidateRange`, and `ValidatePattern` objects:
+Version 1 supports declarative `ValidateSet`, `ValidateRange`, and
+`ValidatePattern` objects:
 
 ```powershell
 Validations = @(
@@ -509,12 +520,9 @@ Examples = @(
 The generator renders them into:
 
 - Get-Help
-- Documentation
-- Tutorials
+- Deterministic Markdown command references
 
 Version 1 generates command reference pages. Cross-command tutorials remain part of advanced documentation generation deferred to Phase 2.
-
-Future versions may reuse them for testing and documentation generation.
 
 ---
 
@@ -595,9 +603,8 @@ Objects supporting multiple variants include a `Type` property.
 Examples include:
 
 - Parameter mappings
+- Parameter validations
 - Completion providers
-- Runtime behaviors
-- Packaging definitions
 
 Objects whose type is implied by their containing collection may omit `Type`.
 

@@ -6,7 +6,8 @@ SubZeroDev.ContainerPSGenerator is a PowerShell 7.4+ build tool for generating r
 
 Repositories describe their public interface in a declarative PowerShell data file. During the normal repository build, the generator produces a complete, self-contained module that is embedded in the container image. Users can then install that module from the image and work with native PowerShell commands instead of assembling `docker run` invocations manually.
 
-> **Status:** Version 1 specification and implementation are under active development.
+> **Status:** The Version 1 MVP workflow is implemented. Release hardening and
+> documentation of inspector input subsets remain in progress.
 
 ## Goals
 
@@ -40,13 +41,18 @@ The current implementation supports the complete basic workflow from a repositor
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
 - Build, install, import, and invoke a generated module through a real Linux container in hosted and local CI.
+- Verify that generated Markdown command references survive image packaging and
+  installation byte-for-byte.
 - Inspect repositories and ordered plugin execution diagnostics without generating build output.
 
-The basic Version 1 workflow is implemented. Remaining work focuses on testing the packaged generator itself, stabilizing release-quality gates, hardening repository inspection, completing runnable examples, and reconciling the documentation before a release candidate. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+The Version 1 MVP blockers are complete. Remaining Version 1 work consists of release
+quality gates, inspector hardening, broader real-container mapping coverage,
+operational documentation, and release preparation. The public plugin SDK and
+additional container runtimes remain deferred to Phase 2.
 
 See [TODO.md](TODO.md) for the complete remaining Version 1 roadmap, release-readiness work, and Phase 2 deferrals.
 
-## How it is intended to work
+## Version 1 workflow
 
 1. A repository defines its module in `PSModule/PSModule.psd1`.
 2. `Build-ContainerModule` inspects the repository and builds an internal object model.
@@ -81,11 +87,17 @@ Repository
 
 Inspectors may analyze Dockerfiles, Compose files, README files, build systems, project files, configuration schemas, OpenAPI definitions, and other repository artifacts. Plugin execution is ordered by filename prefix.
 
-The generated module may contain public cmdlets, private helpers, parameter declarations, validation, completion, help, Docker invocation, preview and diagnostic support, and error handling. It does not depend on a shared runtime library.
+The generated module contains a manifest, loader, public functions, parameter
+declarations, supported validation and static completion attributes, comment-based
+help, Markdown command references, runtime invocation, preview, verbose timing, and
+error handling. Inferred PowerShell commands also package the repository's complete
+`scripts` tree. Generated modules do not depend on a shared runtime library.
 
 ## Specification
 
-See [Specifications.md](Specifications.md) for the Version 1 working draft, including the repository layout, object model, mappings, extensibility model, generated output, and success criteria.
+See [Specifications.md](Specifications.md) for the Version 1 behavior contract,
+repository layout, object model, mappings, internal extensibility model, generated
+output, remaining hardening boundary, and success criteria.
 
 ## Requirements
 
@@ -95,6 +107,8 @@ See [Specifications.md](Specifications.md) for the Version 1 working draft, incl
 
 Windows and Linux are the supported Version 1 platforms and are validated in CI.
 macOS is best-effort for Version 1 and is not part of the required CI matrix.
+Enforcing the 7.4 baseline in every shipped and generated manifest remains a release
+quality gate tracked in [TODO.md](TODO.md).
 
 ## Development
 
@@ -136,7 +150,13 @@ Get-ContainerModulePlugin -Path ./PSModule/Plugins
 Get-ContainerModulePlugin -Path ./PSModule/Plugins -Stage Inspectors, Validators
 ```
 
-Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `CodeGenerators`, `TemplateRenderers`, `RuntimeAdapters`, and `PackagingProviders` directories. Plugin filenames must follow the `<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`. The built-in Docker runtime adapter selects Docker command rendering for container-backed commands; inferred PowerShell scripts and module functions continue to execute from their packaged local sources.
+Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`,
+`RuntimeAdapters`, `CodeGenerators`, `TemplateRenderers`, and
+`PackagingProviders` directories. Plugin filenames must follow the
+`<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`. The
+built-in Docker runtime adapter selects Docker command rendering for container-backed
+commands; inferred PowerShell scripts and module functions continue to execute from
+their packaged local sources.
 
 `Build-ContainerModule` automatically uses a `Plugins` directory beside the resolved specification. Pass `-PluginPath` to select one or more other plugin roots. The internal pipeline runner invokes each plugin with a shared `Context` parameter and records its stage, path, timing, success, and any error. The built-in packaging provider validates the completed module layout and publishes the output directory as the `Package` artifact for subsequent providers. The public plugin SDK remains deferred to Phase 2.
 
@@ -201,7 +221,7 @@ Build-ContainerModule `
     -Output ./artifacts/PSModule
 ```
 
-Generated artifacts currently include:
+Generated artifacts include:
 
 ```text
 artifacts/PSModule/
@@ -344,8 +364,8 @@ Invoke-Pester -Configuration $configuration
 
 This generates the checked-in `examples/Minimal` module, embeds it at `/PSModule` in
 a Linux image, installs and imports it from that image, invokes its generated command
-with argument/environment/mount mappings, verifies help and `-WhatIf`, and removes
-the temporary image afterward.
+with argument/environment/mount mappings, verifies help, `-WhatIf`, and the installed
+Markdown command reference, and removes the temporary image afterward.
 
 To exercise the GitHub Actions workflow locally, install [Docker](https://docs.docker.com/get-docker/) and [act](https://nektosact.com/installation/index.html), ensure Docker is running, and execute:
 

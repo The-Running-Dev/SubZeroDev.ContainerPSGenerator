@@ -11,7 +11,8 @@ run:
 ./examples/Minimal/Run-Example.ps1
 ```
 
-The script returns a structured result from `Invoke-Example`, removes the imported
+The script returns a structured result from `Invoke-Example`, verifies generated
+PowerShell help and the installed Markdown command reference, removes the imported
 module and local image, and deletes its generated files. Pass `-KeepArtifacts` to
 retain `examples/Minimal/artifacts` for inspection.
 
@@ -41,6 +42,8 @@ Invoke-Example `
     -Message 'hello-from-minimal'
 
 Get-Help Invoke-Example -Full
+Get-Content `
+    ./examples/Minimal/artifacts/Installed/ExampleContainer/Documentation/Invoke-Example.md
 ```
 
 Clean up the imported module, image, and generated files:

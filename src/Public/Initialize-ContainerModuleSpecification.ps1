@@ -9,7 +9,10 @@ function Initialize-ContainerModuleSpecification {
     directory, and functions explicitly exported by modules beneath that same boundary.
 
     The generated specification is a scaffold. Review inferred commands and add their
-    container argument, environment, mount, and runtime mappings before publishing.
+    descriptions and help before publishing. Inferred scripts and exported module
+    functions execute from the packaged scripts tree. Add explicit runtime mappings
+    only for authored commands that invoke a container; inference does not guess
+    repository-specific container intent.
 
     .PARAMETER Repository
     Repository to inspect.

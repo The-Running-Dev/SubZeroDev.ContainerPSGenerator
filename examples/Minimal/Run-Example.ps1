@@ -35,35 +35,40 @@ if ($null -eq (Get-Command docker -ErrorAction SilentlyContinue)) {
 Import-Module $generatorManifest -Force -ErrorAction Stop
 
 try {
-    Write-Host '1/7 Generate the PowerShell module'
+    Write-Host '1/8 Generate the PowerShell module'
     Build-ContainerModule `
         -Specification (Join-Path $exampleRoot 'PSModule' 'PSModule.psd1') `
         -Output $generatedModulePath |
         Out-Null
 
-    Write-Host '2/7 Build the container image'
+    Write-Host '2/8 Build the container image'
     & docker build --tag $image $exampleRoot | ForEach-Object { Write-Host $_ }
     if ($LASTEXITCODE -ne 0) {
         throw "Building the minimal example image failed with exit code $LASTEXITCODE."
     }
     $imageBuilt = $true
 
-    Write-Host '3/7 Install the module embedded at /PSModule'
+    Write-Host '3/8 Install the module embedded at /PSModule'
     Install-ContainerModule $image -Destination $installedModulePath | Out-Null
 
-    Write-Host '4/7 Import the installed module'
+    Write-Host '4/8 Import the installed module'
     $generatedModule = Import-Module (
         Join-Path $installedModulePath 'ExampleContainer.psd1'
     ) -Force -PassThru -ErrorAction Stop
 
-    Write-Host '5/7 Invoke its generated command'
+    Write-Host '5/8 Invoke its generated command'
     $invocation = Invoke-Example `
         -Repository (Get-Item -LiteralPath $exampleRoot) `
         -Message 'hello-from-minimal' |
         ConvertFrom-Json
 
-    Write-Host '6/7 Read generated command help'
+    Write-Host '6/8 Read generated command help'
     $help = Get-Help Invoke-Example -Full
+
+    Write-Host '7/8 Read the installed Markdown command reference'
+    $documentationPath = Join-Path $installedModulePath `
+        'Documentation' 'Invoke-Example.md'
+    $documentation = Get-Content -LiteralPath $documentationPath -Raw
 
     [pscustomobject] @{
         PSTypeName = 'SubZeroDev.ContainerPSGenerator.MinimalExampleResult'
@@ -71,11 +76,12 @@ try {
         Module = $generatedModule.Name
         Command = 'Invoke-Example'
         Synopsis = $help.Synopsis
+        DocumentationHeading = ($documentation -split "`r?`n")[0]
         Invocation = $invocation
     }
 }
 finally {
-    Write-Host '7/7 Clean up'
+    Write-Host '8/8 Clean up'
     if ($null -ne $generatedModule) {
         Remove-Module $generatedModule -Force -ErrorAction SilentlyContinue
     }

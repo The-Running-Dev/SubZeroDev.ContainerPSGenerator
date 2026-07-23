@@ -4,8 +4,9 @@ function Test-ContainerModuleSpecification {
     Validates a container module specification.
 
     .DESCRIPTION
-    Loads a PowerShell data-file specification and runs all currently implemented validators.
-    Returns true when the specification is valid. Invalid specifications produce a terminating error.
+    Loads a PowerShell data-file specification and runs the built-in Version 1
+    validators. Returns true when the specification is valid. Invalid specifications
+    produce a terminating error with source and object identity context when available.
 
     .PARAMETER Specification
     Path to the repository's PowerShell data-file specification.

@@ -4,7 +4,11 @@ function Install-ContainerModule {
     Installs a generated PowerShell module from a container image.
 
     .DESCRIPTION
-    Creates a temporary container, copies its /PSModule contents to the selected local directory, and always removes the temporary container.
+    Creates a temporary container without starting it, stages its /PSModule contents,
+    validates the single module manifest, and installs the complete package including
+    generated Markdown documentation. The temporary container is always removed.
+    Existing destinations require Force, and WhatIf previews the operation without
+    calling Docker or modifying the destination.
 
     .PARAMETER Image
     Container image containing a generated module at /PSModule.

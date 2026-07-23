@@ -11,9 +11,9 @@ function Invoke-ContainerModulePluginPipeline {
             'Inspectors',
             'Validators',
             'ObjectModelProcessors',
+            'RuntimeAdapters',
             'CodeGenerators',
             'TemplateRenderers',
-            'RuntimeAdapters',
             'PackagingProviders'
         )]
         [string[]] $Stage
