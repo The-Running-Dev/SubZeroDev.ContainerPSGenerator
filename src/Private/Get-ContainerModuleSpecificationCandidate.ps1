@@ -143,6 +143,7 @@ function Get-ContainerModuleSpecificationCandidate {
 
     [ordered]@{
         Id             = "repository.$($moduleName.ToLowerInvariant())"
+        GeneratedBy    = 'SubZeroDev.ContainerPSGenerator'
         ModuleName     = $moduleName
         ModuleVersion  = '0.1.0'
         ContainerImage = $containerImage

@@ -2471,6 +2471,7 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
 
         $specificationPath = Join-Path $repositoryPath 'PSModule' 'PSModule.psd1'
         $definition = Import-PowerShellDataFile $specificationPath
+        $definition.GeneratedBy | Should -Be 'SubZeroDev.ContainerPSGenerator'
         $definition.ModuleName | Should -Be 'InferredRepository'
         $definition.ContainerImage | Should -Be 'ghcr.io/example/inferred:latest'
         $definition.Commands.Name | Should -Be @('Invoke-ContainerTool', 'Test-RepositoryTool', 'Invoke-InstallTool')
@@ -2509,6 +2510,34 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         & $scriptPath -Repository $repositoryPath | Out-Null
 
         (Get-Content -LiteralPath $specificationPath -Raw).Trim() | Should -Be $authoredSource
+    }
+
+    It 'refreshes a legacy generated scaffold when root scripts are discovered' {
+        $repositoryPath = Join-Path $TestDrive 'LegacyGeneratedRepository'
+        $specificationDirectory = New-Item -Path (Join-Path $repositoryPath 'PSModule') -ItemType Directory -Force
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'LegacyGeneratedRepository'
+    Commands = @(
+        @{
+            Name = 'Invoke-Existing'
+            Description = 'Scaffolded from ''scripts/existing.ps1''. Review its container invocation mappings before publishing.'
+            SourcePath = 'scripts/existing.ps1'
+            SourceKind = 'Script'
+            Parameters = @()
+        }
+    )
+}
+'@
+        Set-Content -LiteralPath (Join-Path $repositoryPath 'setup.ps1') -Value 'param([switch] $Force)'
+
+        $commands = @(& $scriptPath -Repository $repositoryPath -ListCommands)
+        $definition = Import-PowerShellDataFile $specificationPath
+
+        $definition.Commands.Name | Should -Be 'Invoke-Setup'
+        $commands.Name | Should -Contain 'Invoke-Setup'
+        Remove-Module LegacyGeneratedRepository -Force
     }
 
     It 'imports the generated module and lists commands for immediate testing' {

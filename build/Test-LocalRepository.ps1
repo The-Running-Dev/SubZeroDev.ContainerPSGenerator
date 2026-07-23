@@ -63,15 +63,41 @@ try {
     $specificationInitialized = $false
     $specificationExists = Test-Path -LiteralPath $Specification -PathType Leaf
     $refreshEmptySpecification = $false
+    $refreshGeneratedSpecification = $false
     if ($specificationExists -and -not $NoInitialize) {
         $existingDefinition = Import-PowerShellDataFile -LiteralPath $Specification -ErrorAction Stop
         $refreshEmptySpecification = (
             -not $existingDefinition.ContainsKey('Commands') -or
             @($existingDefinition.Commands).Count -eq 0
         )
+        $existingCommands = @($existingDefinition.Commands)
+        $isMarkedGeneratedSpecification = (
+            $existingDefinition.ContainsKey('GeneratedBy') -and
+            $existingDefinition.GeneratedBy -eq 'SubZeroDev.ContainerPSGenerator'
+        )
+        $isLegacyGeneratedSpecification = (
+            $existingCommands.Count -gt 0 -and
+            @($existingCommands | Where-Object {
+                -not $_.ContainsKey('SourcePath') -or
+                -not $_.ContainsKey('SourceKind') -or
+                -not $_.ContainsKey('Description') -or
+                $_.Description -notlike 'Scaffolded from *'
+            }).Count -eq 0
+        )
+        $hasAuthoredMappings = @($existingCommands | Where-Object {
+            $_.ContainsKey('Mappings') -or
+            (
+                $_.ContainsKey('Parameters') -and
+                @($_.Parameters | Where-Object { $_.ContainsKey('Mappings') }).Count -gt 0
+            )
+        }).Count -gt 0
+        $refreshGeneratedSpecification = (
+            ($isMarkedGeneratedSpecification -or $isLegacyGeneratedSpecification) -and
+            -not $hasAuthoredMappings
+        )
     }
 
-    if (-not $specificationExists -or $refreshEmptySpecification) {
+    if (-not $specificationExists -or $refreshEmptySpecification -or $refreshGeneratedSpecification) {
         if ($NoInitialize) {
             throw [System.IO.FileNotFoundException]::new(
                 "Container module specification was not found: '$(Join-Path $repositoryPath $Specification)'."
@@ -80,9 +106,9 @@ try {
         Initialize-ContainerModuleSpecification `
             -Repository $repositoryPath `
             -Specification $Specification `
-            -Force:$refreshEmptySpecification |
+            -Force:($refreshEmptySpecification -or $refreshGeneratedSpecification) |
             Out-Null
-        $action = if ($refreshEmptySpecification) { 'Refreshed' } else { 'Created' }
+        $action = if ($specificationExists) { 'Refreshed' } else { 'Created' }
         Write-Host "$action inferred container module specification: $Specification" -ForegroundColor Green
         $specificationInitialized = $true
     }

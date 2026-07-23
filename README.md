@@ -236,8 +236,10 @@ model. The scaffold infers repository identity, a documented GHCR image referenc
 standalone `*.ps1` scripts in the repository root and beneath `scripts` directories,
 and explicitly exported functions from modules beneath `modules` directories. Review inferred commands and add runtime
 mappings before publishing. An existing specification with no commands is refreshed
-from discovery; authored command collections are always preserved. Initial creation
-or refresh also materializes the inferred commands under `artifacts/PSModule/Public`
+from discovery. Generated, unmapped scaffolds are refreshed on later runs so newly
+discovered scripts appear automatically; authored specifications and scaffolds with
+runtime mappings are preserved. Initial creation or refresh also materializes the
+inferred commands under `artifacts/PSModule/Public`
 while returning the validated model. Use `-NoInitialize` to retain strict behavior
 without creation or refresh.
 

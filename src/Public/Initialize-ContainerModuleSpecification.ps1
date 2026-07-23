@@ -5,8 +5,9 @@ function Initialize-ContainerModuleSpecification {
 
     .DESCRIPTION
     Creates a missing PSModule specification using repository identity, documented
-    container image references, standalone scripts beneath scripts directories, and
-    functions explicitly exported by modules beneath modules directories.
+    container image references, standalone scripts in the repository root and beneath
+    scripts directories, and functions explicitly exported by modules beneath modules
+    directories.
 
     The generated specification is a scaffold. Review inferred commands and add their
     container argument, environment, mount, and runtime mappings before publishing.
