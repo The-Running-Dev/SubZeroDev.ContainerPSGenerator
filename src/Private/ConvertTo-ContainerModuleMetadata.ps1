@@ -11,6 +11,7 @@ function ConvertTo-ContainerModuleMetadata {
         ModuleName    = $Model.ModuleName
         ModuleVersion = $Model.ModuleVersion
         ContainerImage = $Model.ContainerImage
+        Inspection    = $Model.Inspection
         Commands      = @(
             foreach ($command in $Model.Commands) {
                 [ordered] @{

@@ -27,13 +27,14 @@ The current implementation supports the complete basic workflow from a repositor
 - Render static native PowerShell argument completion without restricting accepted values.
 - Generate comment-based help and deterministic Markdown command references from synopsis, descriptions, parameter help, examples, and notes.
 - Automatically discover pipeline plugins beside a specification, invoke all seven stages at defined build boundaries, and retain per-plugin execution diagnostics.
+- Inspect root-level Dockerfile variants and persist ordered build-stage image, alias, and platform metadata.
 - Translate bound parameters into ordered `docker run --rm` arguments for command arguments, environment variables, bind mounts, named volumes, ports, working directories, devices, GPUs, resource limits, secrets, and generic runtime options.
 - Preview generated Docker invocations through `-WhatIf` and report missing-runtime or non-zero-exit failures.
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
 
-Still planned for Version 1 are initial repository inspectors, richer user-facing diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
+Still planned for Version 1 are additional repository inspectors, richer user-facing diagnostics, and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
 ## How it is intended to work
 

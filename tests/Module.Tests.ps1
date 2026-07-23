@@ -284,7 +284,9 @@ Describe 'Container module build context' {
             $context.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.BuildContext'
             $context.SpecificationPath | Should -Be ([System.IO.Path]::GetFullPath($SpecificationPath))
             $context.OutputPath | Should -Be ([System.IO.Path]::GetFullPath($OutputPath))
+            $context.RepositoryPath | Should -Be (Split-Path $SpecificationPath -Parent)
             $context.Specification.Commands[0].Name | Should -Be 'Invoke-Example'
+            $context.Inspection.Count | Should -Be 0
         }
     }
 
@@ -303,6 +305,46 @@ Describe 'Container module build context' {
 
             Test-Path -LiteralPath $OutputPath | Should -BeFalse
         }
+    }
+}
+
+Describe 'Dockerfile inspection' {
+    BeforeEach {
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'Dockerfile') -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'tools.Dockerfile') -Force -ErrorAction SilentlyContinue
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists ordered multi-stage Dockerfile metadata' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'Dockerfile') -Value @'
+FROM --platform=linux/amd64 mcr.microsoft.com/dotnet/sdk:8.0 AS build
+RUN dotnet build
+FROM mcr.microsoft.com/dotnet/runtime:8.0 AS final
+'@
+        Set-Content -LiteralPath (Join-Path $TestDrive 'tools.Dockerfile') -Value 'FROM alpine:3.20'
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $metadata.Inspection.Dockerfiles.Path | Should -Be @('Dockerfile', 'tools.Dockerfile')
+        $metadata.Inspection.Dockerfiles[0].Stages[0].Image | Should -Be 'mcr.microsoft.com/dotnet/sdk:8.0'
+        $metadata.Inspection.Dockerfiles[0].Stages[0].Alias | Should -Be 'build'
+        $metadata.Inspection.Dockerfiles[0].Stages[0].Platform | Should -Be 'linux/amd64'
+        $metadata.Inspection.Dockerfiles[0].Stages[1].Alias | Should -Be 'final'
+        $metadata.Inspection.Dockerfiles[1].Stages[0].Image | Should -Be 'alpine:3.20'
+    }
+
+    It 'persists an empty collection when no Dockerfile exists' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.Dockerfiles).Count | Should -Be 0
     }
 }
 

@@ -15,12 +15,21 @@ function New-ContainerModuleBuildContext {
         $OutputPath
     )
     $specification = Import-ContainerModuleSpecification -Path $resolvedSpecificationPath
+    $specificationDirectory = Split-Path $resolvedSpecificationPath -Parent
+    $repositoryPath = if ((Split-Path $specificationDirectory -Leaf) -eq 'PSModule') {
+        Split-Path $specificationDirectory -Parent
+    }
+    else {
+        $specificationDirectory
+    }
 
     [pscustomobject] @{
         PSTypeName        = 'SubZeroDev.ContainerPSGenerator.BuildContext'
         SpecificationPath = $resolvedSpecificationPath
         OutputPath        = $resolvedOutputPath
+        RepositoryPath    = $repositoryPath
         Specification     = $specification
+        Inspection        = [ordered] @{}
         Model             = $null
         PluginExecutions  = [System.Collections.Generic.List[object]]::new()
     }

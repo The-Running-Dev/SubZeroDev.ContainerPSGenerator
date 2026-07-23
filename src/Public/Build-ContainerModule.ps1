@@ -31,14 +31,14 @@ function Build-ContainerModule {
     )
 
     $context = New-ContainerModuleBuildContext -SpecificationPath $Specification -OutputPath $Output
-    [string[]] $pluginRoots = @()
+    [string[]] $pluginRoots = @((Join-Path $PSScriptRoot '..' 'Plugins'))
     if ($PSBoundParameters.ContainsKey('PluginPath')) {
-        $pluginRoots = @($PluginPath)
+        $pluginRoots += @($PluginPath)
     }
     else {
         $conventionalPluginPath = Join-Path (Split-Path $context.SpecificationPath -Parent) 'Plugins'
         if (Test-Path -LiteralPath $conventionalPluginPath -PathType Container) {
-            $pluginRoots = @($conventionalPluginPath)
+            $pluginRoots += @($conventionalPluginPath)
         }
     }
 
@@ -48,6 +48,7 @@ function Build-ContainerModule {
 
     Assert-ContainerModuleSpecification -Specification $context.Specification
     $context.Model = ConvertTo-ContainerModuleModel -Specification $context.Specification
+    $context.Model | Add-Member -MemberType NoteProperty -Name Inspection -Value $context.Inspection
 
     if ($pluginRoots.Count -gt 0) {
         $null = Invoke-ContainerModulePluginPipeline -Context $context -Path $pluginRoots -Stage ObjectModelProcessors
