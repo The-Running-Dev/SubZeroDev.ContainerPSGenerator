@@ -75,6 +75,7 @@ function ConvertTo-ContainerModuleCommandSource {
             $mandatory = if ($parameter.Mandatory) { 'Mandatory = $true' } else { '' }
             $separator = if ($index -lt ($Command.Parameters.Count - 1)) { ',' } else { '' }
             $parameterType = switch -Regex ($parameter.Type) {
+                '^(?:System\.Management\.Automation\.)?SwitchParameter$' { 'switch'; break }
                 '^DirectoryInfo(\[\])?$' { $parameter.Type -replace '^DirectoryInfo', 'System.IO.DirectoryInfo'; break }
                 '^FileInfo(\[\])?$' { $parameter.Type -replace '^FileInfo', 'System.IO.FileInfo'; break }
                 default { $parameter.Type }

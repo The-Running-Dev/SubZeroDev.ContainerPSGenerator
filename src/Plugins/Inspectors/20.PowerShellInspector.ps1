@@ -27,7 +27,10 @@ $files = foreach ($item in $items) {
     $parameters = @(
         if ($isCommandCandidate -and $ast.ParamBlock) {
             foreach ($parameter in $ast.ParamBlock.Parameters) {
-                $type = if ($parameter.StaticType -and $parameter.StaticType -ne [object]) {
+                $type = if ($parameter.StaticType -eq [Management.Automation.SwitchParameter]) {
+                    'switch'
+                }
+                elseif ($parameter.StaticType -and $parameter.StaticType -ne [object]) {
                     $parameter.StaticType.Name
                 }
                 else { 'string' }

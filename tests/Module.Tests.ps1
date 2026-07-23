@@ -1793,6 +1793,41 @@ Describe 'Container module command source generation' {
         $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
         [System.IO.File]::ReadAllText($sourcePath) | Should -BeExactly $firstContent
     }
+
+    It 'normalizes SwitchParameter specifications into importable switch parameters' {
+        $specificationPath = Join-Path $TestDrive 'SwitchParameter.psd1'
+        $outputPath = Join-Path $TestDrive 'switch-parameter-output'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'SwitchParameterExample'
+    Commands = @(
+        @{ Name = 'Invoke-SwitchExample'; Parameters = @(
+            @{ Name = 'Force'; Type = 'SwitchParameter' }
+            @{ Name = 'NoOpen'; Type = 'System.Management.Automation.SwitchParameter' }
+        ) }
+    )
+}
+'@
+
+        $null = Build-ContainerModule -Specification $specificationPath -Output $outputPath
+        $source = Get-Content -LiteralPath (
+            Join-Path $outputPath 'Public' 'Invoke-SwitchExample.ps1'
+        ) -Raw
+        $module = Import-Module (
+            Join-Path $outputPath 'SwitchParameterExample.psd1'
+        ) -Force -PassThru
+        try {
+            $source | Should -Match '\[switch\] \$Force'
+            $source | Should -Match '\[switch\] \$NoOpen'
+            (Get-Command Invoke-SwitchExample).Parameters['Force'].ParameterType |
+                Should -Be ([Management.Automation.SwitchParameter])
+            (Get-Command Invoke-SwitchExample).Parameters['NoOpen'].ParameterType |
+                Should -Be ([Management.Automation.SwitchParameter])
+        }
+        finally {
+            Remove-Module $module -Force
+        }
+    }
 }
 
 Describe 'Container module loader generation' {
@@ -2478,6 +2513,7 @@ Export-ModuleMember -Function @('Test-RepositoryTool')
         $definition.Commands[0].SourceKind | Should -Be 'Script'
         $definition.Commands[0].Parameters.Name | Should -Be @('Name', 'Force')
         $definition.Commands[0].Parameters[0].Mandatory | Should -BeTrue
+        $definition.Commands[0].Parameters[1].Type | Should -Be 'switch'
         $definition.Commands[1].SourceKind | Should -Be 'ModuleFunction'
         Test-Path -LiteralPath (Join-Path $repositoryPath 'artifacts' 'PSModule' 'Public' 'Invoke-ContainerTool.ps1') |
             Should -BeFalse

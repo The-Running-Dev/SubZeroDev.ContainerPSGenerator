@@ -51,7 +51,10 @@ function ConvertTo-ContainerModuleModel {
                                 Id         = $parameter['Id']
                                 Name       = $parameter['Name']
                                 Description = $parameter['Description']
-                                Type       = $parameter['Type']
+                                Type       = if ($parameter['Type'] -in @(
+                                    'SwitchParameter',
+                                    'System.Management.Automation.SwitchParameter'
+                                )) { 'switch' } else { $parameter['Type'] }
                                 Mandatory  = if ($parameter.Contains('Mandatory')) { $parameter['Mandatory'] } else { $false }
                                 Completions = $completions
                                 Validations = $validations
