@@ -127,7 +127,12 @@ Inspect a repository without generating a module, then view ordered plugin diagn
 $inspection = Get-ContainerModuleInspection -Specification ./PSModule/PSModule.psd1
 $inspection.Data
 $inspection | Get-ContainerModuleDiagnostic
+$inspection | Get-ContainerModuleDiagnostic -Detailed
 ```
+
+The concise diagnostic view reports stage, execution order, plugin, duration, and success for readable CI logs. Use `-Detailed` to include the resolved plugin path, start time, and error text while troubleshooting.
+
+Repository plugins are trusted code, not sandboxed extensions. Inspect plugin scripts before running the generator and only use plugin roots from repositories and sources you trust. A plugin receives the shared build context and runs with the same filesystem, process, network, and credential access as the PowerShell process invoking this module.
 
 Install a generated module embedded at `/PSModule` in a container image:
 

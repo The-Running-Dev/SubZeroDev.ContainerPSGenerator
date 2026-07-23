@@ -15,6 +15,9 @@ function Get-ContainerModuleDiagnostic {
 
     .PARAMETER PluginPath
     One or more additional plugin roots when running a new inspection.
+
+    .PARAMETER Detailed
+    Includes plugin paths, start times, and error text for troubleshooting.
     #>
     [CmdletBinding(DefaultParameterSetName = 'Run')]
     param (
@@ -27,7 +30,10 @@ function Get-ContainerModuleDiagnostic {
 
         [Parameter(ParameterSetName = 'Run')]
         [ValidateNotNullOrEmpty()]
-        [string[]] $PluginPath
+        [string[]] $PluginPath,
+
+        [Parameter()]
+        [switch] $Detailed
     )
 
     process {
@@ -46,17 +52,20 @@ function Get-ContainerModuleDiagnostic {
         }
 
         foreach ($execution in $inspection.PluginExecutions) {
-            [pscustomobject] @{
+            $diagnostic = [ordered] @{
                 PSTypeName           = 'SubZeroDev.ContainerPSGenerator.Diagnostic'
                 Stage                = $execution.Stage
                 ExecutionOrder       = $execution.ExecutionOrder
                 Plugin               = $execution.Plugin
-                Path                 = $execution.Path
-                StartedAt            = $execution.StartedAt
                 DurationMilliseconds = [math]::Round($execution.Duration.TotalMilliseconds, 3)
                 Succeeded            = $execution.Succeeded
-                Error                = $execution.Error
             }
+            if ($Detailed) {
+                $diagnostic.Path = $execution.Path
+                $diagnostic.StartedAt = $execution.StartedAt
+                $diagnostic.Error = $execution.Error
+            }
+            [pscustomobject] $diagnostic
         }
     }
 }

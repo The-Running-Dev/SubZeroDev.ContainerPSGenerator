@@ -18,7 +18,9 @@ function Test-ContainerModuleSpecification {
     )
 
     $specificationData = Import-ContainerModuleSpecification -Path $Specification
-    Assert-ContainerModuleSpecification -Specification $specificationData
+    Invoke-ContainerModuleSpecificationValidation `
+        -Specification $specificationData `
+        -SpecificationPath $Specification
 
     return $true
 }
