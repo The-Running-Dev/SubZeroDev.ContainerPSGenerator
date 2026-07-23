@@ -1,3 +1,3 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
-$Context.Artifacts['Metadata'] = Write-ContainerModuleMetadata -Context $Context
+$Context.RenderRequests.Add('Metadata')

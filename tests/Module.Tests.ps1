@@ -338,6 +338,10 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
                 -Context $context `
                 -Path $pluginRoot `
                 -Stage CodeGenerators
+            $null = Invoke-ContainerModulePluginPipeline `
+                -Context $context `
+                -Path $pluginRoot `
+                -Stage TemplateRenderers
             $context
         }
 
@@ -349,6 +353,11 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             'CodeGenerators'
             'CodeGenerators'
             'CodeGenerators'
+            'TemplateRenderers'
+            'TemplateRenderers'
+            'TemplateRenderers'
+            'TemplateRenderers'
+            'TemplateRenderers'
         )
         $context.PluginExecutions.Plugin | Should -Be @(
             'SpecificationValidator'
@@ -358,8 +367,20 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
             'CommandDocumentationGenerator'
             'LoaderGenerator'
             'ManifestGenerator'
+            'MetadataRenderer'
+            'CommandSourceRenderer'
+            'CommandDocumentationRenderer'
+            'LoaderRenderer'
+            'ManifestRenderer'
         )
         $context.Model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
+        $context.RenderRequests | Should -Be @(
+            'Metadata'
+            'CommandSource'
+            'CommandDocumentation'
+            'Loader'
+            'Manifest'
+        )
         $context.Artifacts.Metadata.FullName | Should -Be (
             Join-Path $context.OutputPath 'Metadata' 'model.json'
         )
