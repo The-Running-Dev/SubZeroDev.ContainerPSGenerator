@@ -402,6 +402,209 @@ services:
     }
 }
 
+Describe 'Project manifest inspection' {
+    BeforeEach {
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'src') -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath (Join-Path $TestDrive 'node_modules') -Recurse -Force -ErrorAction SilentlyContinue
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists .NET and Node project metadata in normalized path order' {
+        $dotNetPath = New-Item -Path (Join-Path $TestDrive 'src' 'Api') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $dotNetPath.FullName 'Api.csproj') -Value @'
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0</TargetFrameworks>
+    <OutputType>Exe</OutputType>
+    <AssemblyName>Example.Api</AssemblyName>
+    <PackageId>Example.Api.Package</PackageId>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Serilog" Version="3.1.1" />
+    <PackageReference Include="Example.Package"><Version>1.2.3</Version></PackageReference>
+  </ItemGroup>
+</Project>
+'@
+        $nodePath = New-Item -Path (Join-Path $TestDrive 'src' 'Web') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $nodePath.FullName 'package.json') -Value @'
+{
+  "name": "example-web",
+  "version": "1.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.0.0",
+  "scripts": { "test": "vitest", "build": "vite build" },
+  "dependencies": { "react": "latest", "axios": "latest" },
+  "devDependencies": { "vite": "latest" }
+}
+'@
+        $ignoredPath = New-Item -Path (Join-Path $TestDrive 'node_modules' 'ignored') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $ignoredPath.FullName 'package.json') -Value '{ "name": "ignored" }'
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $dotNet = $metadata.Inspection.DotNetProjects[0]
+        $dotNet.Path | Should -Be 'src/Api/Api.csproj'
+        $dotNet.Sdk | Should -Be 'Microsoft.NET.Sdk.Web'
+        $dotNet.TargetFrameworks | Should -Be @('net8.0', 'net9.0')
+        $dotNet.PackageReferences.Name | Should -Be @('Serilog', 'Example.Package')
+        $dotNet.PackageReferences.Version | Should -Be @('3.1.1', '1.2.3')
+
+        $node = $metadata.Inspection.NodeProjects[0]
+        $node.Path | Should -Be 'src/Web/package.json'
+        $node.Name | Should -Be 'example-web'
+        $node.Private | Should -BeTrue
+        $node.Scripts | Should -Be @('build', 'test')
+        $node.Dependencies | Should -Be @('axios', 'react')
+        $metadata.Inspection.NodeProjects.Count | Should -Be 1
+    }
+
+    It 'persists empty collections when no supported project manifests exist' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.DotNetProjects).Count | Should -Be 0
+        @($metadata.Inspection.NodeProjects).Count | Should -Be 0
+    }
+}
+
+Describe 'README inspection' {
+    BeforeEach {
+        foreach ($name in @('README.md', 'README.markdown', 'README.txt', 'README')) {
+            Remove-Item -LiteralPath (Join-Path $TestDrive $name) -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach {
+        Pop-Location
+    }
+
+    It 'persists ordered README headings and fenced-code languages' {
+        Set-Content -LiteralPath (Join-Path $TestDrive 'README.md') -Value @'
+# Example Tool
+
+## Install
+
+```powershell
+Install-Module Example
+# Not a heading
+```
+
+### Usage
+
+~~~
+unlabelled
+~~~
+'@
+        Set-Content -LiteralPath (Join-Path $TestDrive 'README.txt') -Value "Plain text title`nDetails"
+
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        $metadata.Inspection.Readmes.Path | Should -Be @('README.md', 'README.txt')
+        $markdown = $metadata.Inspection.Readmes[0]
+        $markdown.Title | Should -Be 'Example Tool'
+        $markdown.Headings.Level | Should -Be @(1, 2, 3)
+        $markdown.Headings.Text | Should -Be @('Example Tool', 'Install', 'Usage')
+        $markdown.CodeLanguages[0] | Should -Be 'powershell'
+        $markdown.CodeLanguages.Count | Should -Be 2
+        $null -eq $markdown.CodeLanguages[1] | Should -BeTrue
+        $metadata.Inspection.Readmes[1].Title | Should -Be 'Plain text title'
+    }
+
+    It 'persists an empty collection when no root README exists' {
+        $artifact = Build-ContainerModule
+        $metadata = Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json
+
+        @($metadata.Inspection.Readmes).Count | Should -Be 0
+    }
+}
+
+Describe 'Remaining repository inspector chain' {
+    BeforeEach {
+        foreach ($path in @('.github', '.nuke', 'build', 'scripts', 'schemas', 'api')) {
+            Remove-Item -LiteralPath (Join-Path $TestDrive $path) -Recurse -Force -ErrorAction SilentlyContinue
+        }
+        New-Item -Path (Join-Path $TestDrive 'PSModule') -ItemType Directory -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $TestDrive 'PSModule' 'PSModule.psd1') -Value '@{ Commands = @() }'
+        Push-Location $TestDrive
+    }
+
+    AfterEach { Pop-Location }
+
+    It 'persists PowerShell, workflow, NUKE, schema, and OpenAPI metadata' {
+        $scripts = New-Item -Path (Join-Path $TestDrive 'scripts') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $scripts.FullName 'Tools.psm1') -Value @'
+class ToolOptions {}
+function Invoke-Tool { param() }
+'@
+
+        $workflows = New-Item -Path (Join-Path $TestDrive '.github' 'workflows') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $workflows.FullName 'ci.yml') -Value @'
+name: CI
+on:
+  push:
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+'@
+
+        $nuke = New-Item -Path (Join-Path $TestDrive '.nuke') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $nuke.FullName 'parameters.json') -Value '{ "Configuration": "Release", "Verbosity": "Normal" }'
+        $build = New-Item -Path (Join-Path $TestDrive 'build') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $build.FullName 'Build.csproj') -Value @'
+<Project Sdk="Microsoft.NET.Sdk"><ItemGroup><PackageReference Include="Nuke.Common" Version="8.0.0" /></ItemGroup></Project>
+'@
+        Set-Content -LiteralPath (Join-Path $build.FullName 'build.ps1') -Value 'function Invoke-Build { }'
+
+        $schemas = New-Item -Path (Join-Path $TestDrive 'schemas') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $schemas.FullName 'settings.schema.json') -Value @'
+{ "$schema": "https://json-schema.org/draft/2020-12/schema", "$id": "example.settings", "title": "Settings", "type": "object", "required": ["name"], "properties": { "port": {}, "name": {} } }
+'@
+        $api = New-Item -Path (Join-Path $TestDrive 'api') -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $api.FullName 'openapi.json') -Value @'
+{ "openapi": "3.1.0", "info": { "title": "Example API", "version": "1.2.0" }, "paths": { "/users": {}, "/health": {} } }
+'@
+
+        $artifact = Build-ContainerModule
+        $inspection = (Get-Content -LiteralPath $artifact.FullName -Raw | ConvertFrom-Json).Inspection
+
+        $powerShell = $inspection.PowerShellFiles | Where-Object Path -eq 'scripts/Tools.psm1'
+        $powerShell.Functions | Should -Be @('Invoke-Tool')
+        $powerShell.Classes | Should -Be @('ToolOptions')
+        $powerShell.ParseErrors.Count | Should -Be 0
+
+        $inspection.GitHubActions[0].Name | Should -Be 'CI'
+        $inspection.GitHubActions[0].Triggers | Should -Be @('push', 'pull_request')
+        $inspection.GitHubActions[0].Jobs | Should -Be @('test')
+
+        $inspection.Nuke.IsConfigured | Should -BeTrue
+        $inspection.Nuke.ParameterNames | Should -Be @('Configuration', 'Verbosity')
+        $inspection.Nuke.ProjectPaths | Should -Be @('build/Build.csproj')
+        $inspection.Nuke.BuildScripts | Should -Be @('build/build.ps1')
+
+        $schema = $inspection.ConfigurationSchemas[0]
+        $schema.Id | Should -Be 'example.settings'
+        $schema.Required | Should -Be @('name')
+        $schema.Properties | Should -Be @('name', 'port')
+
+        $openApi = $inspection.OpenApiDocuments[0]
+        $openApi.SpecificationVersion | Should -Be '3.1.0'
+        $openApi.Title | Should -Be 'Example API'
+        $openApi.Paths | Should -Be @('/health', '/users')
+    }
+}
+
 Describe 'Build-ContainerModule command validation' {
     BeforeEach {
         Push-Location $TestDrive
