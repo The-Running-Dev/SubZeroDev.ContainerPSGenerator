@@ -5,7 +5,13 @@ function ConvertTo-ContainerModuleCommandSource {
         [psobject] $Command,
 
         [Parameter(Mandatory)]
-        [string] $ContainerImage
+        [string] $ContainerImage,
+
+        [Parameter()]
+        [string] $SourceKind,
+
+        [Parameter()]
+        [string] $PackagedSourcePath
     )
 
     $lines = [System.Collections.Generic.List[string]]::new()
@@ -69,6 +75,7 @@ function ConvertTo-ContainerModuleCommandSource {
             $mandatory = if ($parameter.Mandatory) { 'Mandatory = $true' } else { '' }
             $separator = if ($index -lt ($Command.Parameters.Count - 1)) { ',' } else { '' }
             $parameterType = switch -Regex ($parameter.Type) {
+                '^(?:System\.Management\.Automation\.)?SwitchParameter$' { 'switch'; break }
                 '^DirectoryInfo(\[\])?$' { $parameter.Type -replace '^DirectoryInfo', 'System.IO.DirectoryInfo'; break }
                 '^FileInfo(\[\])?$' { $parameter.Type -replace '^FileInfo', 'System.IO.FileInfo'; break }
                 default { $parameter.Type }
@@ -103,6 +110,42 @@ function ConvertTo-ContainerModuleCommandSource {
             $lines.Add("        [$parameterType] `$$($parameter.Name)$separator")
         }
         $lines.Add('    )')
+    }
+
+    if ($SourceKind -in @('Script', 'ModuleFunction')) {
+        $escapedSourcePath = $PackagedSourcePath.Replace("'", "''")
+        $lines.Add('')
+        $lines.Add('    $sourceParameters = @{}')
+        foreach ($parameter in $Command.Parameters) {
+            $lines.Add("    if (`$PSBoundParameters.ContainsKey('$($parameter.Name)')) {")
+            $lines.Add("        `$sourceParameters['$($parameter.Name)'] = `$$($parameter.Name)")
+            $lines.Add('    }')
+        }
+        $lines.Add('    $moduleRoot = Split-Path $PSScriptRoot -Parent')
+        $lines.Add("    `$sourcePath = Join-Path `$moduleRoot '$escapedSourcePath'")
+        $lines.Add("    if (-not (Test-Path -LiteralPath `$sourcePath -PathType Leaf)) {")
+        $lines.Add("        throw [System.IO.FileNotFoundException]::new('Discovered PowerShell source was not found.', `$sourcePath)")
+        $lines.Add('    }')
+        $lines.Add('')
+        $lines.Add("    if (-not `$PSCmdlet.ShouldProcess(`$sourcePath, 'Invoke discovered PowerShell $SourceKind')) {")
+        $lines.Add('        return')
+        $lines.Add('    }')
+        $lines.Add('')
+        $lines.Add("    Write-Verbose `"Invoking discovered PowerShell source: `$sourcePath`"")
+        $lines.Add('    $sourceStopwatch = [System.Diagnostics.Stopwatch]::StartNew()')
+        if ($SourceKind -eq 'Script') {
+            $lines.Add('    & $sourcePath @sourceParameters')
+        }
+        else {
+            $escapedCommandName = $Command.Name.Replace("'", "''")
+            $lines.Add('    $sourceModule = Import-Module $sourcePath -Force -PassThru -ErrorAction Stop')
+            $lines.Add("    `$sourceCommand = Get-Command -Module `$sourceModule.Name -Name '$escapedCommandName' -ErrorAction Stop")
+            $lines.Add('    & $sourceCommand @sourceParameters')
+        }
+        $lines.Add('    $sourceStopwatch.Stop()')
+        $lines.Add('    Write-Verbose ("PowerShell source finished after {0:N2}s." -f $sourceStopwatch.Elapsed.TotalSeconds)')
+        $lines.Add('}')
+        return ($lines -join "`n") + "`n"
     }
 
     $lines.Add('')
@@ -289,12 +332,18 @@ function ConvertTo-ContainerModuleCommandSource {
     $lines.Add("        throw [System.InvalidOperationException]::new('Docker is required to run this command but was not found on PATH.')")
     $lines.Add('    }')
     $lines.Add('')
+    $lines.Add("    `$dockerCommand = 'docker ' + (`$dockerArguments -join ' ')")
+    $lines.Add("    Write-Verbose `"Starting container command: `$dockerCommand`"")
+    $lines.Add("    Write-Verbose 'Docker is attached to this session. Press Ctrl+C to stop a command that does not return.'")
+    $lines.Add('    $dockerStopwatch = [System.Diagnostics.Stopwatch]::StartNew()')
     $lines.Add('    $global:LASTEXITCODE = 0')
     $lines.Add('    & docker @dockerArguments')
     $lines.Add('    $dockerSucceeded = $?')
     $lines.Add('    $dockerExitCode = $global:LASTEXITCODE')
+    $lines.Add('    $dockerStopwatch.Stop()')
+    $lines.Add('    Write-Verbose ("Container command finished after {0:N2}s with exit code {1}." -f $dockerStopwatch.Elapsed.TotalSeconds, $dockerExitCode)')
     $lines.Add('    if (-not $dockerSucceeded -or $dockerExitCode -ne 0) {')
-    $lines.Add('        throw [System.InvalidOperationException]::new("Docker failed with exit code $dockerExitCode.")')
+    $lines.Add('        throw [System.InvalidOperationException]::new("Docker failed with exit code $dockerExitCode. Command: $dockerCommand")')
     $lines.Add('    }')
     $lines.Add('}')
 

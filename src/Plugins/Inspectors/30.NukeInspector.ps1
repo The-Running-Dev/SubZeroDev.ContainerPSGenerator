@@ -15,8 +15,13 @@ if ($Context.Inspection.Contains('DotNetProjects')) {
     } | ForEach-Object Path)
 }
 [string[]] $buildScripts = @()
-if ($Context.Inspection.Contains('PowerShellFiles')) {
-    $buildScripts = @($Context.Inspection.PowerShellFiles | Where-Object { $_.Path -match '(^|/)build\.ps1$' } | ForEach-Object Path)
+$buildScriptItems = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File -Filter 'build.ps1' |
+    Where-Object { Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName })
+if ($buildScriptItems.Count -gt 0) {
+    $buildScripts = @($buildScriptItems | ForEach-Object {
+        [IO.Path]::GetRelativePath($Context.RepositoryPath, $_.FullName).Replace('\', '/')
+    })
+    [Array]::Sort($buildScripts, [StringComparer]::Ordinal)
 }
 $Context.Inspection['Nuke'] = [ordered]@{
     IsConfigured   = (Test-Path -LiteralPath $nukeDirectory -PathType Container) -or $projectPaths.Count -gt 0

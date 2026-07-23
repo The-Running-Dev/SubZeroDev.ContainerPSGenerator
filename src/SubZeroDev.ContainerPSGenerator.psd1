@@ -13,6 +13,7 @@
         'Get-ContainerModuleDiagnostic'
         'Get-ContainerModulePlugin'
         'Install-ContainerModule'
+        'Initialize-ContainerModuleSpecification'
         'Test-ContainerModuleSpecification'
     )
 

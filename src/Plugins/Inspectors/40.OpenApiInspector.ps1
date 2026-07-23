@@ -1,11 +1,9 @@
 param ([Parameter(Mandatory)] [psobject] $Context)
 
 $names = '^(?i:(?:openapi|swagger).*)\.(?:json|ya?ml)$'
-$outputPrefix = $Context.OutputPath.TrimEnd([IO.Path]::DirectorySeparatorChar, [IO.Path]::AltDirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 $items = @(Get-ChildItem -LiteralPath $Context.RepositoryPath -Recurse -File | Where-Object {
     $_.Name -match $names -and
-    -not $_.FullName.StartsWith($outputPrefix, [StringComparison]::OrdinalIgnoreCase) -and
-    $_.FullName -notmatch '[\\/](?:\.git|node_modules|artifacts|bin|obj)[\\/]'
+    (Test-ContainerModuleInspectionPath -Context $Context -Path $_.FullName)
 })
 [Array]::Sort($items, [Collections.Generic.Comparer[object]]::Create({ param($a,$b) [StringComparer]::Ordinal.Compare($a.FullName,$b.FullName) }))
 

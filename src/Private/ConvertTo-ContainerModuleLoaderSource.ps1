@@ -5,13 +5,19 @@ function ConvertTo-ContainerModuleLoaderSource {
     @'
 Set-StrictMode -Version 3.0
 
-$publicFunctions = Get-ChildItem -LiteralPath (Join-Path $PSScriptRoot 'Public') -Filter '*.ps1' |
-    Sort-Object -Property Name
+$publicPath = Join-Path $PSScriptRoot 'Public'
+$publicFunctions = @(
+    if (Test-Path -LiteralPath $publicPath -PathType Container) {
+        Get-ChildItem -LiteralPath $publicPath -Filter '*.ps1' |
+            Sort-Object -Property Name
+    }
+)
 
 foreach ($function in $publicFunctions) {
     . $function.FullName
 }
 
-Export-ModuleMember -Function $publicFunctions.BaseName
+$exportedFunctions = @($publicFunctions | ForEach-Object BaseName)
+Export-ModuleMember -Function $exportedFunctions
 '@.Replace("`r`n", "`n") + "`n"
 }

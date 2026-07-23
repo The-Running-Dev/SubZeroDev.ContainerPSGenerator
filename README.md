@@ -1,5 +1,7 @@
 # SubZeroDev.ContainerPSGenerator
 
+[![Test](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml/badge.svg)](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml)
+
 SubZeroDev.ContainerPSGenerator is a proposed PowerShell 7+ build tool for generating repository-specific PowerShell modules for containerized applications.
 
 Repositories describe their public interface in a declarative PowerShell data file. During the normal repository build, the generator produces a complete, self-contained module that is embedded in the container image. Users can then install that module from the image and work with native PowerShell commands instead of assembling `docker run` invocations manually.
@@ -200,10 +202,37 @@ Get-Help Invoke-Example -Full
 
 ### Test another local repository
 
-Point the repository harness at any checkout containing `PSModule/PSModule.psd1`:
+The [LLMs PowerShell module discovery specification](docs/LLMs-PowerShell-Module-Discovery-Specification.md)
+is an implementation-ready migration brief for making the LLMs repository's
+existing module exports and standalone component scripts discoverable without
+exposing setup orchestrators or container infrastructure.
+
+Clone or use any repository independently, then point the repository harness at its
+local checkout. Test repositories are intentionally not embedded as Git submodules:
 
 ```powershell
 ./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository
+```
+
+When the target does not contain a specification, the harness creates
+`PSModule/PSModule.psd1` from repository inspection and then returns its validated
+model. The scaffold infers repository identity, a documented GHCR image reference,
+standalone `*.ps1` scripts and explicitly exported functions from `.psm1` modules
+beneath the repository's `scripts` directory. Files elsewhere in the repository are
+not inferred as commands. Review inferred commands and add runtime
+mappings before publishing. An existing specification with no commands is refreshed
+from discovery. Generated, unmapped scaffolds are refreshed on later runs so newly
+discovered scripts appear automatically; authored specifications and scaffolds with
+runtime mappings are preserved. Initial creation or refresh also materializes the
+inferred commands under `artifacts/PSModule/Public`
+while returning the validated model. Use `-NoInitialize` to retain strict behavior
+without creation or refresh.
+
+To materialize inferred definitions as importable command files under
+`artifacts/PSModule/Public`, run:
+
+```powershell
+./build/Test-LocalRepository.ps1 -Repository ../MyContainerRepository -Generate
 ```
 
 The script imports this checkout of ContainerPSGenerator, validates the target repository's specification, and returns its normalized object model. Select non-default paths when needed:
@@ -224,6 +253,41 @@ To continue into the generation pipeline, add `-Generate`:
 ```
 
 The harness invokes the real `Build-ContainerModule` entry point. It currently returns the generated `Metadata/model.json`; additional module artifacts will appear through the same command as generation stages are added.
+
+To generate the module, import it into the current PowerShell session, and show the
+commands available for testing, run:
+
+```powershell
+./build/Test-LocalRepository.ps1 `
+    -Repository ../MyContainerRepository `
+    -ListCommands
+```
+
+The returned command objects include their names and parameter metadata. Because the
+generated module is imported globally, you can invoke a listed command immediately
+after the harness returns.
+
+Preview a generated Docker invocation before running it:
+
+```powershell
+Invoke-MyCommand -WhatIf
+```
+
+Trace the exact Docker command, attachment behavior, elapsed time, and exit code:
+
+```powershell
+Invoke-MyCommand -Verbose
+```
+
+The repository's complete `scripts` tree is copied once into the generated module's
+`Scripts` directory, preserving entry points, modules, sibling helpers, and supporting
+files. Inferred commands with `SourceKind = 'Script'` invoke their packaged `.ps1`
+file. Inferred `ModuleFunction` commands import their packaged `.psm1` from that same
+tree and invoke the exported function module-qualified. Paths relative to the source
+`scripts` directory are preserved, and wrappers resolve them relative to the module
+instead of embedding development-machine paths.
+Commands without a supported source kind remain container wrappers and require a
+real `ContainerImage` plus runtime mappings.
 
 ### Run the tests
 
@@ -256,6 +320,12 @@ The script builds a local act runner image with PowerShell, then runs both the `
 Because `act` itself runs inside a container, its nested Docker daemon cannot access test files created inside the runner's private `/tmp` directory. The local CI path therefore validates a shared `/tmp` bind mount, while direct and hosted runs additionally verify the mounted sentinel file and content.
 
 Act uses Linux containers and cannot faithfully reproduce GitHub's hosted Windows runner. Run the direct Pester command on Windows for fast host-platform feedback; GitHub Actions remains authoritative for both the Windows and Ubuntu jobs.
+
+Each hosted workflow run publishes the Windows and Ubuntu unit results, the container
+end-to-end results, and a Linux code-coverage summary directly on the Actions run.
+The underlying NUnit and JaCoCo XML reports are also available as downloadable
+workflow artifacts. GitHub-only reporting steps are skipped when the workflow runs
+locally through `act`.
 
 ## License
 
