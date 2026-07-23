@@ -35,16 +35,17 @@ This file tracks work that remains after the built-in repository inspector chain
 
 ### 4. Real container end-to-end coverage
 
-- [ ] Add a representative fixture repository and container image.
-- [ ] Generate its PowerShell module during the test build.
-- [ ] Embed the generated module at `/PSModule` in the image.
-- [ ] Build the image with Docker.
-- [ ] Install the module from the image with `Install-ContainerModule`.
-- [ ] Import the installed module and invoke a generated command against the container runtime.
+- [x] Add a representative fixture repository and container image.
+- [x] Generate its PowerShell module during the test build.
+- [x] Embed the generated module at `/PSModule` in the image.
+- [x] Build the image with Docker.
+- [x] Install the module from the image with `Install-ContainerModule`.
+- [x] Import the installed module and invoke a generated command against the container runtime.
 - [ ] Verify argument, environment, mount, port, working-directory, volume, device, GPU, resource-limit, secret, and runtime-option behavior where the runner supports it.
-- [ ] Verify `Get-Help`, Markdown documentation, and `-WhatIf` behavior in the packaged module.
-- [ ] Run the supported end-to-end path in hosted CI and through `build/Invoke-CI.ps1`/`act` locally.
-- [ ] Ensure temporary containers, images, staged files, and installation directories are cleaned up after success and failure.
+- [x] Verify `Get-Help` and `-WhatIf` behavior in the packaged module.
+- [ ] Verify generated Markdown documentation in the packaged module end-to-end.
+- [x] Run the supported end-to-end path in hosted CI and through `build/Invoke-CI.ps1`/`act` locally.
+- [x] Ensure temporary containers, images, staged files, and installation directories are cleaned up after success and failure.
 
 ### 5. Examples and documentation
 

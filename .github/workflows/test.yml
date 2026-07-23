@@ -40,3 +40,27 @@ jobs:
           $configuration.Run.Exit = $true
           $configuration.Output.Verbosity = 'Detailed'
           Invoke-Pester -Configuration $configuration
+
+  container-e2e:
+    name: Container end-to-end
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Install and import Pester
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          Install-Module Pester -RequiredVersion 5.5.0 -Scope CurrentUser -Force -SkipPublisherCheck -ErrorAction Stop
+          Import-Module Pester -RequiredVersion 5.5.0 -Force -ErrorAction Stop
+
+      - name: Run container end-to-end tests
+        shell: pwsh
+        run: |
+          $configuration = New-PesterConfiguration
+          $configuration.Run.Path = './tests-e2e'
+          $configuration.Run.Exit = $true
+          $configuration.Output.Verbosity = 'Detailed'
+          Invoke-Pester -Configuration $configuration

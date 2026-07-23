@@ -37,17 +37,21 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the local CI runner image failed with exit code $LASTEXITCODE."
 }
 
-$actArguments = @(
-    'pull_request'
-    '--workflows', $workflowPath
-    '--job', 'pester'
-    '--matrix', 'os:ubuntu-latest'
-    '--platform', "ubuntu-latest=$runnerImage"
-    '--pull=false'
-)
+foreach ($job in @('pester', 'container-e2e')) {
+    $actArguments = @(
+        'pull_request'
+        '--workflows', $workflowPath
+        '--job', $job
+        '--platform', "ubuntu-latest=$runnerImage"
+        '--pull=false'
+    )
+    if ($job -eq 'pester') {
+        $actArguments += @('--matrix', 'os:ubuntu-latest')
+    }
 
-& $actCommand.Source $actArguments
+    & $actCommand.Source $actArguments
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Local CI failed with exit code $LASTEXITCODE."
+    if ($LASTEXITCODE -ne 0) {
+        throw "Local CI job '$job' failed with exit code $LASTEXITCODE."
+    }
 }
