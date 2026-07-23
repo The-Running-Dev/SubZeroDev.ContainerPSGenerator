@@ -295,8 +295,8 @@ Describe 'Build-ContainerModule specification loading' {
         $tracePath = Join-Path $TestDrive 'plugin-trace.txt'
         $stages = @(
             'Inspectors'
-            'ObjectModelProcessors'
             'Validators'
+            'ObjectModelProcessors'
             'RuntimeAdapters'
             'CodeGenerators'
             'TemplateRenderers'
@@ -314,6 +314,30 @@ Add-Content -LiteralPath '$tracePath' -Value '$stage'
         $null = Build-ContainerModule
 
         Get-Content -LiteralPath $tracePath | Should -Be $stages
+    }
+
+    It 'runs built-in validation and model normalization through ordered plugins' {
+        $context = InModuleScope SubZeroDev.ContainerPSGenerator -Parameters @{
+            SpecificationPath = Join-Path $TestDrive 'PSModule' 'PSModule.psd1'
+            OutputPath = Join-Path $TestDrive 'generated'
+            ModuleRoot = Split-Path $manifestPath -Parent
+        } {
+            param ($SpecificationPath, $OutputPath, $ModuleRoot)
+            $context = New-ContainerModuleBuildContext `
+                -SpecificationPath $SpecificationPath `
+                -OutputPath $OutputPath
+            $pluginRoot = Join-Path $ModuleRoot 'Plugins'
+
+            $null = Invoke-ContainerModulePluginPipeline `
+                -Context $context `
+                -Path $pluginRoot `
+                -Stage Validators, ObjectModelProcessors
+            $context
+        }
+
+        $context.PluginExecutions.Stage | Should -Be @('Validators', 'ObjectModelProcessors')
+        $context.PluginExecutions.Plugin | Should -Be @('SpecificationValidator', 'SpecificationModelProcessor')
+        $context.Model.PSObject.TypeNames | Should -Contain 'SubZeroDev.ContainerPSGenerator.Model'
     }
 
     It 'uses explicitly selected plugin roots' {

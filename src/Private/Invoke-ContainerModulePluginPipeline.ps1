@@ -62,6 +62,9 @@ function Invoke-ContainerModulePluginPipeline {
         }
         catch {
             $execution.Error = $_.Exception.Message
+            if ($_.Exception.Data['ContainerModule.PreserveType']) {
+                throw
+            }
             throw [System.InvalidOperationException]::new(
                 "Plugin '$($plugin.Name)' in stage '$($plugin.Stage)' failed: $($_.Exception.Message)",
                 $_.Exception

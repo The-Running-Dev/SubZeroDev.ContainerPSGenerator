@@ -15,8 +15,8 @@ This file tracks work that remains after the built-in repository inspector chain
 
 ### 2. Complete the internal plugin architecture
 
-- [ ] Move built-in specification validation behind ordered validator plugins.
-- [ ] Move object-model normalization and enrichment behind object-model processor plugins.
+- [x] Move built-in specification validation behind ordered validator plugins.
+- [x] Move object-model normalization and enrichment behind object-model processor plugins.
 - [ ] Move command source, loader, manifest, metadata, and documentation generation behind code-generator plugins.
 - [ ] Move rendering concerns behind template-renderer plugins.
 - [ ] Move Docker-specific command construction behind the built-in Docker runtime-adapter plugin.

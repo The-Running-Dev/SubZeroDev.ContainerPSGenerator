@@ -38,9 +38,11 @@ function Invoke-ContainerModuleSpecificationValidation {
             $context += "; Object Id: '$($uniqueIds -join "', '")'"
         }
 
-        throw [System.IO.InvalidDataException]::new(
+        $exception = [System.IO.InvalidDataException]::new(
             "$($_.Exception.Message) [$context]",
             $_.Exception
         )
+        $exception.Data['ContainerModule.PreserveType'] = $true
+        throw $exception
     }
 }

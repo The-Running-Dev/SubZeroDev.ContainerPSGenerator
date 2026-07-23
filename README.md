@@ -121,6 +121,8 @@ Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `C
 
 `Build-ContainerModule` automatically uses a `Plugins` directory beside the resolved specification. Pass `-PluginPath` to select one or more other plugin roots. The internal pipeline runner invokes each plugin with a shared `Context` parameter and records its stage, path, timing, success, and any error. The public plugin SDK remains deferred to Phase 2.
 
+Built-in specification validation and object-model normalization use the same ordered plugin pipeline. `Build-ContainerModule` now orchestrates these stages without directly implementing either concern, while `Test-ContainerModuleSpecification` and `Get-ContainerModuleModel` run the corresponding built-in stages independently.
+
 Inspect a repository without generating a module, then view ordered plugin diagnostics:
 
 ```powershell
