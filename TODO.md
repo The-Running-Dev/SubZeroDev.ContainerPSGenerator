@@ -22,7 +22,7 @@ work queue.
 
 - [x] Make `Build-ContainerModule` orchestration-only and keep it as the single public
   build command.
-- [ ] Add deterministic package regression tests that prove repeated builds produce
+- [x] Add deterministic package regression tests that prove repeated builds produce
   identical files without changing current behavior.
 - [ ] Build and test a packaged copy of the generator module from a clean location
   instead of testing only the development module under `src/`.

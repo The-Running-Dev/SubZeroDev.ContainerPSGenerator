@@ -2109,6 +2109,98 @@ Describe 'Container module manifest generation' {
 }
 
 Describe 'Container module output reset' {
+    It 'produces an identical complete package across repeated builds' {
+        $repositoryPath = Join-Path $TestDrive 'deterministic-package-repository'
+        $specificationDirectory = New-Item -Path (
+            Join-Path $repositoryPath 'PSModule'
+        ) -ItemType Directory -Force
+        $scriptsDirectory = New-Item -Path (
+            Join-Path $repositoryPath 'scripts'
+        ) -ItemType Directory -Force
+        $supportDirectory = New-Item -Path (
+            Join-Path $scriptsDirectory 'support'
+        ) -ItemType Directory -Force
+        Set-Content -LiteralPath (Join-Path $scriptsDirectory 'Invoke-Local.ps1') -Value @'
+param([string] $Name)
+"Hello, $Name"
+'@
+        Set-Content -LiteralPath (
+            Join-Path $supportDirectory 'settings.json'
+        ) -Value '{ "enabled": true }'
+        $specificationPath = Join-Path $specificationDirectory 'PSModule.psd1'
+        Set-Content -LiteralPath $specificationPath -Value @'
+@{
+    ModuleName = 'DeterministicPackage'
+    ModuleVersion = '1.2.3'
+    ContainerImage = 'example/deterministic:1.2.3'
+    Commands = @(
+        @{
+            Name = 'Invoke-ContainerExample'
+            Description = 'Runs the container example.'
+            Parameters = @(
+                @{ Name = 'Message'; Type = 'string'; Mappings = @(
+                    @{ Type = 'Argument'; Name = '--message' }
+                ) }
+            )
+        }
+        @{
+            Name = 'Invoke-Local'
+            Description = 'Runs the packaged local script.'
+            SourceKind = 'Script'
+            SourcePath = 'scripts/Invoke-Local.ps1'
+            Parameters = @(
+                @{ Name = 'Name'; Type = 'string' }
+            )
+        }
+    )
+}
+'@
+        $outputPath = Join-Path $repositoryPath 'artifacts' 'PSModule'
+        $getPackageSnapshot = {
+            param ([string] $Path)
+
+            @(
+                Get-ChildItem -LiteralPath $Path -File -Recurse |
+                    Sort-Object {
+                        [IO.Path]::GetRelativePath($Path, $_.FullName)
+                    } |
+                    ForEach-Object {
+                        $relativePath = [IO.Path]::GetRelativePath($Path, $_.FullName) -replace '\\', '/'
+                        $hash = [Security.Cryptography.SHA256]::HashData(
+                            [IO.File]::ReadAllBytes($_.FullName)
+                        )
+                        [ordered] @{
+                            Path   = $relativePath
+                            Length = $_.Length
+                            SHA256 = [Convert]::ToHexString($hash)
+                        }
+                    }
+            ) | ConvertTo-Json -Compress
+        }
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $firstSnapshot = & $getPackageSnapshot $outputPath
+        $firstPaths = @(
+            (Get-ChildItem -LiteralPath $outputPath -File -Recurse).ForEach({
+                [IO.Path]::GetRelativePath($outputPath, $_.FullName) -replace '\\', '/'
+            })
+        )
+
+        Build-ContainerModule -Specification $specificationPath -Output $outputPath | Out-Null
+        $secondSnapshot = & $getPackageSnapshot $outputPath
+
+        $firstPaths | Should -Contain 'DeterministicPackage.psd1'
+        $firstPaths | Should -Contain 'DeterministicPackage.psm1'
+        $firstPaths | Should -Contain 'Metadata/model.json'
+        $firstPaths | Should -Contain 'Public/Invoke-ContainerExample.ps1'
+        $firstPaths | Should -Contain 'Public/Invoke-Local.ps1'
+        $firstPaths | Should -Contain 'Documentation/Invoke-ContainerExample.md'
+        $firstPaths | Should -Contain 'Documentation/Invoke-Local.md'
+        $firstPaths | Should -Contain 'Scripts/Invoke-Local.ps1'
+        $firstPaths | Should -Contain 'Scripts/support/settings.json'
+        $secondSnapshot | Should -BeExactly $firstSnapshot
+    }
+
     It 'removes stale artifacts before generating the current module' {
         $specificationPath = Join-Path $TestDrive 'Reset.psd1'
         $outputPath = Join-Path $TestDrive 'reset-output'
