@@ -38,6 +38,7 @@ The current implementation supports the complete basic workflow from a repositor
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
 - Build, install, import, and invoke a generated module through a real Linux container in hosted and local CI.
+- Inspect repositories and ordered plugin execution diagnostics without generating build output.
 
 Still planned for Version 1 are richer user-facing diagnostics and a real container end-to-end packaging test. The public plugin SDK and additional container runtimes remain deferred to Phase 2.
 
@@ -119,6 +120,14 @@ Get-ContainerModulePlugin -Path ./PSModule/Plugins -Stage Inspectors, Validators
 Plugin roots may contain `Inspectors`, `Validators`, `ObjectModelProcessors`, `CodeGenerators`, `TemplateRenderers`, `RuntimeAdapters`, and `PackagingProviders` directories. Plugin filenames must follow the `<numeric-prefix>.<name>.ps1` convention, such as `00.DockerfileInspector.ps1`.
 
 `Build-ContainerModule` automatically uses a `Plugins` directory beside the resolved specification. Pass `-PluginPath` to select one or more other plugin roots. The internal pipeline runner invokes each plugin with a shared `Context` parameter and records its stage, path, timing, success, and any error. The public plugin SDK remains deferred to Phase 2.
+
+Inspect a repository without generating a module, then view ordered plugin diagnostics:
+
+```powershell
+$inspection = Get-ContainerModuleInspection -Specification ./PSModule/PSModule.psd1
+$inspection.Data
+$inspection | Get-ContainerModuleDiagnostic
+```
 
 Install a generated module embedded at `/PSModule` in a container image:
 

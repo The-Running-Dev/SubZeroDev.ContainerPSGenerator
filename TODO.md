@@ -6,9 +6,9 @@ This file tracks work that remains after the built-in repository inspector chain
 
 ### 1. Developer diagnostics
 
-- [ ] Add a dedicated command that runs repository inspection without generating a module.
-- [ ] Add a command that returns plugin discovery and execution diagnostics, including stage, order, duration, success, and failure details.
-- [ ] Surface inspection results as typed PowerShell objects so developers do not need to read `Metadata/model.json`.
+- [x] Add a dedicated command that runs repository inspection without generating a module.
+- [x] Add a command that returns plugin discovery and execution diagnostics, including stage, order, duration, success, and failure details.
+- [x] Surface inspection results as typed PowerShell objects so developers do not need to read `Metadata/model.json`.
 - [ ] Include specification object IDs and source context in validation errors where available.
 - [ ] Add concise and detailed diagnostic views suitable for interactive use and CI logs.
 - [ ] Document plugin execution as trusted repository code and explain the security boundary.
