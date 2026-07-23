@@ -26,6 +26,8 @@ This file tracks work that remains after the built-in repository inspector chain
 
 ### 3. Inspector hardening
 
+- [x] Handle missing, empty, and null JSON Schema property collections without failing inspection.
+- [x] Ignore malformed ordinary JSON while reporting malformed files explicitly named `*.schema.json`.
 - [ ] Add focused malformed-input behavior for Dockerfiles, Compose files, project manifests, README files, workflows, NUKE configuration, schemas, and OpenAPI documents.
 - [ ] Decide whether malformed optional repository artifacts should produce warnings or fail the build, then apply the rule consistently.
 - [ ] Replace the limited Compose, GitHub Actions, and OpenAPI YAML readers with a shared YAML parser or explicitly document their supported subset.
@@ -60,13 +62,19 @@ This file tracks work that remains after the built-in repository inspector chain
 ### 5a. Repository onboarding
 
 - [x] Initialize a missing `PSModule/PSModule.psd1` from repository inspection.
+- [x] Limit PowerShell inference to scripts and exported module functions beneath the repository's `scripts` directory.
 - [x] Infer module identity, documented container image, script commands, exported module functions, and parameter metadata.
+- [x] Package the complete `scripts` tree so inferred commands retain sibling modules, helpers, and supporting files.
+- [x] Generate, import, and list commands from another local repository through `build/Test-LocalRepository.ps1`.
+- [x] Support repositories where discovery produces a valid module with no commands.
 - [ ] Add runtime mappings to inferred commands after repository-specific invocation intent is known.
+- [ ] Add maintained integration fixtures for representative script-only and build-agent repositories without embedding their source checkouts.
 
 ### 6. Release readiness
 
 - [ ] Add static analysis and formatting checks for PowerShell source.
-- [ ] Add test coverage reporting and define a minimum acceptable threshold.
+- [x] Publish unit, end-to-end, and code-coverage reports in GitHub Actions.
+- [ ] Define and enforce a minimum acceptable coverage threshold.
 - [ ] Test the packaged generator module rather than only importing it from `src/`.
 - [ ] Validate supported PowerShell 7 versions on Windows and Linux.
 - [ ] Decide and document the support policy for macOS.
@@ -86,11 +94,11 @@ This file tracks work that remains after the built-in repository inspector chain
 
 ## Version 1 definition of done
 
-- [ ] A repository author can define `PSModule/PSModule.psd1` and generate deterministic module output.
-- [ ] The generated module is embedded at `/PSModule` in a real image.
-- [ ] A user can install it with `Install-ContainerModule`, import it, invoke generated commands, and use `Get-Help` without manually constructing `docker run` arguments.
+- [x] A repository author can define `PSModule/PSModule.psd1` and generate deterministic module output.
+- [x] The generated module is embedded at `/PSModule` in a real image.
+- [x] A user can install it with `Install-ContainerModule`, import it, invoke generated commands, and use `Get-Help` without manually constructing `docker run` arguments.
 - [ ] Built-in stages run through the internal plugin pipeline and failures provide actionable diagnostics.
-- [ ] Direct Pester, hosted Windows and Linux CI, local `act`, and the real container end-to-end workflow all pass.
+- [x] Direct Pester, hosted Windows and Linux CI, local `act`, and the real container end-to-end workflow all pass.
 - [ ] Documentation accurately distinguishes implemented Version 1 behavior from Phase 2 plans.
 
 ## Deferred to Phase 2
