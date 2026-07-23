@@ -403,6 +403,34 @@ Set-Content -LiteralPath '$markerPath' -Value 'invoked'
         Get-Content -LiteralPath $markerPath | Should -Be 'invoked'
     }
 
+    It 'validates rendered artifacts before invoking packaging providers' {
+        $pluginRoot = Join-Path $TestDrive 'ArtifactValidationPlugins'
+        $rendererPath = New-Item -Path (
+            Join-Path $pluginRoot 'TemplateRenderers'
+        ) -ItemType Directory -Force
+        $packagingPath = New-Item -Path (
+            Join-Path $pluginRoot 'PackagingProviders'
+        ) -ItemType Directory -Force
+        $packagingMarker = Join-Path $TestDrive 'packaging-ran.txt'
+        Set-Content -LiteralPath (
+            Join-Path $rendererPath.FullName '99.RemoveMetadata.ps1'
+        ) -Value @'
+param ([psobject] $Context)
+$Context.Artifacts.Remove('Metadata')
+'@
+        Set-Content -LiteralPath (
+            Join-Path $packagingPath.FullName '00.WriteMarker.ps1'
+        ) -Value @"
+param ([psobject] `$Context)
+Set-Content -LiteralPath '$packagingMarker' -Value 'packaged'
+"@
+
+        {
+            Build-ContainerModule -PluginPath $pluginRoot
+        } | Should -Throw '*template-renderer stage did not produce the metadata artifact*'
+        Test-Path -LiteralPath $packagingMarker | Should -BeFalse
+    }
+
     It 'rejects an explicitly selected missing plugin root' {
         { Build-ContainerModule -PluginPath (Join-Path $TestDrive 'MissingPlugins') } |
             Should -Throw -ExceptionType ([System.IO.DirectoryNotFoundException]) -ExpectedMessage '*Plugin root*was not found*'
