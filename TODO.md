@@ -123,6 +123,8 @@ Complete these in order so every inspector follows the same policy:
   to the repository's `scripts` directory.
 - [x] Packaging of the complete `scripts` tree and local-repository command testing.
 - [x] Empty-module support and malformed JSON Schema handling.
+- [x] Installable PowerShell NuGet package validation and release-driven publishing
+  to GitHub Packages.
 
 ## Deferred to Phase 2
 

@@ -1,6 +1,7 @@
 # SubZeroDev.ContainerPSGenerator
 
 [![Test](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml/badge.svg)](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/test.yml)
+[![Publish](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/publish.yml/badge.svg)](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/actions/workflows/publish.yml)
 
 SubZeroDev.ContainerPSGenerator is a PowerShell 7.4+ build tool for generating repository-specific PowerShell modules for containerized applications.
 
@@ -40,6 +41,8 @@ The current implementation supports the complete basic workflow from a repositor
 - Install `/PSModule` from a container image through a staged, manifest-validated, replace-safe workflow with `-Force` and `-WhatIf` support.
 - Test another local repository through `build/Test-LocalRepository.ps1` and reproduce the Linux CI job locally with `build/Invoke-CI.ps1` and `act`.
 - Run the Pester suite on hosted Windows and Ubuntu runners.
+- Build and install-test a genuine PowerShell NuGet package, and publish matching
+  GitHub Releases to GitHub Packages.
 - Build, install, import, and invoke a generated module through a real Linux container in hosted and local CI.
 - Verify that generated Markdown command references survive image packaging and
   installation byte-for-byte.
@@ -107,8 +110,52 @@ output, remaining hardening boundary, and success criteria.
 
 Windows and Linux are the supported Version 1 platforms and are validated in CI.
 macOS is best-effort for Version 1 and is not part of the required CI matrix.
-Enforcing the 7.4 baseline in every shipped and generated manifest remains a release
-quality gate tracked in [TODO.md](TODO.md).
+The generator and generated-module manifests enforce the PowerShell 7.4 baseline,
+which is validated on Windows and Linux in CI.
+
+## Install from GitHub Packages
+
+GitHub Packages requires authentication for PowerShell package operations, including
+downloads from public packages. Create a classic personal access token with
+`read:packages`, then keep it out of shell history by entering it through a secure
+prompt:
+
+```powershell
+$token = Read-Host 'GitHub token (read:packages)' -AsSecureString
+$credential = [pscredential]::new('YOUR_GITHUB_USERNAME', $token)
+
+Register-PSResourceRepository `
+    -Name SubZeroDevGitHub `
+    -Uri 'https://nuget.pkg.github.com/The-Running-Dev/index.json' `
+    -ApiVersion V3 `
+    -Trusted
+
+Install-PSResource `
+    -Name SubZeroDev.ContainerPSGenerator `
+    -Repository SubZeroDevGitHub `
+    -Credential $credential `
+    -Scope CurrentUser
+
+Import-Module SubZeroDev.ContainerPSGenerator
+```
+
+Use `Update-PSResource` with the same repository and credential to install a newer
+published version. The first published package may be private until a package
+administrator changes its visibility in GitHub Packages settings.
+
+## Publish a release
+
+The [Publish workflow](.github/workflows/publish.yml) runs when a GitHub Release is
+published. Set `ModuleVersion` in
+`src/SubZeroDev.ContainerPSGenerator.psd1`, commit that change, then publish a release
+whose tag is exactly `v<ModuleVersion>`, such as `v0.1.0`.
+
+The workflow validates the tag against the manifest, creates and locally
+install-tests the `.nupkg`, uploads it as a workflow artifact, and pushes it to the
+`The-Running-Dev` GitHub Packages NuGet feed. It uses the release workflow's
+short-lived `GITHUB_TOKEN` with `packages: write`; no repository publishing secret
+is required. Reusing a published package version is rejected so releases remain
+immutable.
 
 ## Development
 
@@ -142,6 +189,17 @@ The default package location is
 `artifacts/module/SubZeroDev.ContainerPSGenerator`. Pass `-Output` to stage it
 elsewhere. Packaging replaces only the validated output directory and includes the
 manifest, loader, public and private functions, and built-in plugins.
+
+Build the distributable NuGet package and verify that PowerShell can install and
+import it from a temporary local package repository:
+
+```powershell
+./build/Test-GeneratorNuGetPackage.ps1 -InstallDependencies
+```
+
+The package is written to `artifacts/packages`. Once
+Microsoft.PowerShell.PSResourceGet 1.1.0 or later is installed, subsequent runs can
+omit `-InstallDependencies`.
 
 Inspect an ordered plugin layout without executing plugin code:
 
@@ -394,7 +452,7 @@ To exercise the GitHub Actions workflow locally, install [Docker](https://docs.d
 ```
 
 The script builds a local act runner image, then runs the PowerShell 7.4 baseline,
-quality, `ubuntu-latest` Pester, and real `container-e2e` jobs from
+quality, `ubuntu-latest` Pester, NuGet packaging, and real `container-e2e` jobs from
 `.github/workflows/test.yml`. The base images and pinned tool dependencies are
 downloaded on the first run; later runs reuse Docker's build cache.
 

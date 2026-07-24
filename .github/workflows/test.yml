@@ -194,6 +194,25 @@ jobs:
           path: artifacts/test-results/${{ matrix.os }}
           if-no-files-found: error
 
+  nuget-package:
+    name: PowerShell NuGet package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Build, install, and import package
+        shell: pwsh
+        run: ./build/Test-GeneratorNuGetPackage.ps1 -InstallDependencies
+
+      - name: Upload NuGet package
+        uses: actions/upload-artifact@v4
+        with:
+          name: generator-nuget-package
+          path: artifacts/packages/*.nupkg
+          if-no-files-found: error
+
   container-e2e:
     name: Container end-to-end
     runs-on: ubuntu-latest
