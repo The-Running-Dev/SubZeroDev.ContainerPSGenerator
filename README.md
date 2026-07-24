@@ -376,8 +376,8 @@ Invoke-Pester -Configuration $configuration
 
 This generates the checked-in `examples/Minimal` module, embeds it at `/PSModule` in
 a Linux image, installs and imports it from that image, invokes its generated command
-with argument/environment/mount mappings, verifies help, `-WhatIf`, and the installed
-Markdown command reference, and removes the temporary image afterward.
+across the supported non-hardware mapping categories, verifies help, `-WhatIf`, and
+the installed Markdown command reference, and removes the temporary image afterward.
 
 To exercise the GitHub Actions workflow locally, install [Docker](https://docs.docker.com/get-docker/) and [act](https://nektosact.com/installation/index.html), ensure Docker is running, and execute:
 
@@ -396,6 +396,11 @@ end-to-end results, and a Linux code-coverage summary directly on the Actions ru
 The underlying NUnit and JaCoCo XML reports are also available as downloadable
 workflow artifacts. GitHub-only reporting steps are skipped when the workflow runs
 locally through `act`.
+
+The packaged generator currently measures 86.83% Pester command coverage and 87.96%
+JaCoCo line coverage. CI requires at least 85% for both metrics, leaving a small
+maintenance margin while preventing meaningful coverage regressions. The Ubuntu
+Pester job and `./build/Invoke-CI.ps1` enforce the same threshold.
 
 ## License
 
