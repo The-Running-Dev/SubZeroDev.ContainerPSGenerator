@@ -68,7 +68,10 @@ try {
     }
 
     $null = New-Item -Path $installRoot -ItemType Directory -Force
-    $repositoryUri = [uri] ([IO.Path]::GetFullPath($package.DirectoryName))
+    $repositoryUri = [uri]::new(
+        [IO.Path]::GetFullPath($package.DirectoryName),
+        [UriKind]::Absolute
+    )
     Register-PSResourceRepository `
         -Name $repositoryName `
         -Uri $repositoryUri.AbsoluteUri `
