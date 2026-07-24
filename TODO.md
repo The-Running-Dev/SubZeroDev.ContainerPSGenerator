@@ -44,7 +44,7 @@ work queue.
   threshold, and enforce it in CI.
 - [x] Raise generator and generated-module manifests to PowerShell 7.4 and validate
   that baseline explicitly on Windows and Linux.
-- [ ] Complete the release-blocking documentation journey in
+- [x] Complete the release-blocking documentation journey in
   [`docs/TODO.md`](docs/TODO.md).
 
 ## 3. Inspector hardening

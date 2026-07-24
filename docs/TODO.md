@@ -1,8 +1,15 @@
+---
+title: Documentation roadmap
+description: Remaining documentation delivery and review work.
+sidebar_position: 99
+---
+
 # Documentation roadmap
 
 This backlog tracks user, repository-author, contributor, and release
 documentation separately from the engineering roadmap in
-[`TODO.md`](../TODO.md). It is ordered by the shortest path from a new user finding
+[`TODO.md`](https://github.com/The-Running-Dev/SubZeroDev.ContainerPSGenerator/blob/main/TODO.md).
+It is ordered by the shortest path from a new user finding
 the project to successfully generating, testing, and publishing a container module.
 
 Documentation must describe implemented Version 1 behavior only. Planned Phase 2
@@ -28,81 +35,82 @@ tests before their task is considered complete.
 
 ## 1. Release-blocking user journey
 
-- [ ] Restructure the root README as a concise landing page containing the project
+- [x] Restructure the root README as a concise landing page containing the project
   purpose, current status, installation command, five-minute example, supported
   platforms, and links to detailed guides.
-- [ ] Write a clean-machine getting-started guide covering GitHub Packages
+- [x] Write a clean-machine getting-started guide covering GitHub Packages
   authentication, installation, import, specification creation, generation,
   command discovery, `-WhatIf`, and cleanup.
-- [ ] Write a repository-author tutorial that starts with an empty repository and
+- [x] Write a repository-author tutorial that starts with an empty repository and
   produces a working `PSModule/PSModule.psd1`, generated module, and container image.
-- [ ] Write a script-only repository tutorial covering automatic specification
+- [x] Write a script-only repository tutorial covering automatic specification
   initialization, the `scripts` directory boundary, inferred script commands,
   exported `.psm1` functions, refresh behavior, and runtime-mapping limitations.
-- [ ] Create a complete Version 1 specification reference for root properties,
+- [x] Create a complete Version 1 specification reference for root properties,
   commands, parameters, stable IDs, mappings, validation, completion, help,
-  examples, source kinds, container images, and rejected unknown fields.
-- [ ] Add tested recipes for every supported parameter mapping: Argument,
+  examples, source kinds, container images, typed-object rejection behavior, and
+  the extension boundary.
+- [x] Add tested recipes for every supported parameter mapping: Argument,
   Environment, Mount, Volume, Port, WorkingDirectory, Device, Gpu, ResourceLimit,
   Secret, and RuntimeOption.
-- [ ] Add tested recipes for every supported validation, static-completion, help,
+- [x] Add tested recipes for every supported validation, static-completion, help,
   notes, and structured-example feature.
-- [ ] Document the generated package layout, `/PSModule` container contract,
+- [x] Document the generated package layout, `/PSModule` container contract,
   installation lifecycle, replacement safety, module import, and generated Markdown
   command references.
-- [ ] Write troubleshooting guidance for PowerShell 7.4, Docker availability,
+- [x] Write troubleshooting guidance for PowerShell 7.4, Docker availability,
   GitHub Packages credentials, package visibility, `act`, plugin failures,
   malformed specifications, malformed inspected artifacts, missing runtime
   mappings, path resolution, and failed container commands.
-- [ ] Document Windows and Linux support and clearly identify macOS as unvalidated,
+- [x] Document Windows and Linux support and clearly identify macOS as unvalidated,
   best-effort Version 1 behavior.
 
 ## 2. Reference documentation
 
-- [ ] Document each public generator command with purpose, syntax, parameters,
+- [x] Document each public generator command with purpose, syntax, parameters,
   outputs, side effects, examples, failure behavior, and links to related guides.
-- [ ] Document every inspection metadata shape and the repository files from which
+- [x] Document every inspection metadata shape and the repository files from which
   it is produced.
-- [ ] Document the supported Version 1 input subset and malformed-input behavior for
+- [x] Document the supported Version 1 input subset and malformed-input behavior for
   Dockerfiles, Docker Compose, .NET, Node, README, PowerShell ASTs, GitHub Actions,
   NUKE, JSON Schema, and OpenAPI inspection.
-- [ ] Document inspector exclusions for generated output, dependencies, caches,
+- [x] Document inspector exclusions for generated output, dependencies, caches,
   source-control directories, and nested repositories.
-- [ ] Write an architecture overview for specification loading, inspection,
+- [x] Write an architecture overview for specification loading, inspection,
   validation, normalization, runtime adaptation, generation, rendering, and
   packaging.
-- [ ] Document the shared plugin context, stage ordering, discovery convention,
+- [x] Document the shared plugin context, stage ordering, discovery convention,
   diagnostics, trust boundary, and current internal contract without promising
   Phase 2 compatibility.
-- [ ] Add a trusted repository-plugin example spanning at least one inspection stage
+- [x] Add a trusted repository-plugin example spanning at least one inspection stage
   and one generation or packaging stage.
-- [ ] Document deterministic output guarantees and which artifacts are suitable for
+- [x] Document deterministic output guarantees and which artifacts are suitable for
   source control, CI artifacts, container layers, and package feeds.
 
 ## 3. Contributor and release operations
 
-- [ ] Add `CONTRIBUTING.md` with environment setup, branch and PR expectations,
+- [x] Add a contributor guide with environment setup, branch and PR expectations,
   repository layout, formatting, Pester, coverage, Docker end-to-end tests, and
   local `act` usage.
-- [ ] Add `SECURITY.md` with supported-version and private vulnerability-reporting
+- [x] Add a security guide with supported-version and private vulnerability-reporting
   guidance.
 - [ ] Select and add a `LICENSE`, then reference it from the README and package
   metadata.
-- [ ] Add `CHANGELOG.md` using a consistent release-note format and backfill the
+- [x] Add a changelog using a consistent release-note format and backfill the
   Version 1 implementation milestones.
-- [ ] Document module versioning, release-tag format, immutable package versions,
+- [x] Document module versioning, release-tag format, immutable package versions,
   GitHub Release creation, GitHub Packages publishing, package visibility, and
   rollback or superseding-release procedures.
-- [ ] Create a release checklist covering version changes, changelog entries,
+- [x] Create a release checklist covering version changes, changelog entries,
   documentation review, clean-machine validation, CI, package installation, release
   publication, and post-publication smoke testing.
-- [ ] Document the CI job matrix, test and coverage reports, package artifact,
+- [x] Document the CI job matrix, test and coverage reports, package artifact,
   publishing workflow permissions, and which hosted checks cannot be reproduced
   faithfully with `act`.
 
 ## 4. Documentation delivery and quality
 
-- [ ] Define the documentation navigation and map existing Markdown files into the
+- [x] Define the documentation navigation and map existing Markdown files into the
   `docs-template` Docusaurus structure without duplicating the root README.
 - [ ] Integrate the documentation content with `docs-template` while preserving a
   readable GitHub Markdown experience.
