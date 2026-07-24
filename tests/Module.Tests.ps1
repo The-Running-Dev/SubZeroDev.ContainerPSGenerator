@@ -12,7 +12,10 @@ BeforeAll {
 
 Describe 'SubZeroDev.ContainerPSGenerator module' {
     It 'has a valid module manifest' {
-        Test-ModuleManifest $manifestPath -ErrorAction Stop | Should -Not -BeNullOrEmpty
+        $manifest = Test-ModuleManifest $manifestPath -ErrorAction Stop
+
+        $manifest | Should -Not -BeNullOrEmpty
+        $manifest.PowerShellVersion.ToString() | Should -Be '7.4'
     }
 
     It 'exports the public commands' {
@@ -2191,6 +2194,7 @@ Describe 'Container module manifest generation' {
         $module = Import-Module $generatedManifestPath -Force -PassThru
         try {
             $manifest.Version.ToString() | Should -Be '2.3.4'
+            $manifest.PowerShellVersion.ToString() | Should -Be '7.4'
             $module.ExportedFunctions.Keys | Should -Contain 'Invoke-ManifestExample'
         }
         finally {

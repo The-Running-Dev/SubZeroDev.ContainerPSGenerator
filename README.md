@@ -358,6 +358,14 @@ owned PowerShell under `src`, `build`, `examples`, `tests`, and `tests-e2e` usin
 `.config/PSScriptAnalyzerSettings.psd1`; it intentionally excludes the external
 `docs-template` checkout.
 
+CI installs the pinned PowerShell 7.4 LTS runtime on both Windows and Linux, then
+packages and imports the generator and generates and imports the minimal example.
+To run that exact baseline check from an existing PowerShell 7.4 session:
+
+```powershell
+./build/Test-PowerShellBaseline.ps1
+```
+
 Run the fast test suite directly with Pester:
 
 ```powershell
@@ -385,7 +393,10 @@ To exercise the GitHub Actions workflow locally, install [Docker](https://docs.d
 ./build/Invoke-CI.ps1
 ```
 
-The script builds a local act runner image with PowerShell, then runs both the `ubuntu-latest` Pester matrix leg and the real `container-e2e` job from `.github/workflows/test.yml`. The base images are downloaded on the first run; later runs reuse Docker's build cache.
+The script builds a local act runner image, then runs the PowerShell 7.4 baseline,
+quality, `ubuntu-latest` Pester, and real `container-e2e` jobs from
+`.github/workflows/test.yml`. The base images and pinned tool dependencies are
+downloaded on the first run; later runs reuse Docker's build cache.
 
 Because `act` itself runs inside a container, its nested Docker daemon cannot access test files created inside the runner's private `/tmp` directory. The local CI path therefore validates a shared `/tmp` bind mount, while direct and hosted runs additionally verify the mounted sentinel file and content.
 

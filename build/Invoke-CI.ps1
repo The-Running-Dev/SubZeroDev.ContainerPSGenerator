@@ -37,7 +37,7 @@ if ($LASTEXITCODE -ne 0) {
     throw "Building the local CI runner image failed with exit code $LASTEXITCODE."
 }
 
-foreach ($job in @('quality', 'pester', 'container-e2e')) {
+foreach ($job in @('powershell-baseline', 'quality', 'pester', 'container-e2e')) {
     $actArguments = @(
         'pull_request'
         '--workflows', $workflowPath
@@ -45,7 +45,7 @@ foreach ($job in @('quality', 'pester', 'container-e2e')) {
         '--platform', "ubuntu-latest=$runnerImage"
         '--pull=false'
     )
-    if ($job -eq 'pester') {
+    if ($job -in @('powershell-baseline', 'pester')) {
         $actArguments += @('--matrix', 'os:ubuntu-latest')
     }
 

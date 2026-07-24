@@ -12,6 +12,47 @@ permissions:
   contents: read
 
 jobs:
+  powershell-baseline:
+    name: PowerShell 7.4 baseline (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up .NET 8
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install and validate PowerShell 7.4 baseline
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $toolPath = Join-Path $PWD 'artifacts' 'pwsh-7.4'
+          dotnet tool install PowerShell --version 7.4.17 --tool-path $toolPath
+          if ($LASTEXITCODE -ne 0) {
+            throw "Installing the PowerShell 7.4 baseline failed with exit code $LASTEXITCODE."
+          }
+
+          $executable = if ($IsWindows) {
+            Join-Path $toolPath 'pwsh.exe'
+          }
+          else {
+            Join-Path $toolPath 'pwsh'
+          }
+          & $executable -NoLogo -NoProfile -File ./build/Test-PowerShellBaseline.ps1
+          if ($LASTEXITCODE -ne 0) {
+            throw "PowerShell 7.4 baseline validation failed with exit code $LASTEXITCODE."
+          }
+
   quality:
     name: PowerShell quality
     runs-on: ubuntu-latest

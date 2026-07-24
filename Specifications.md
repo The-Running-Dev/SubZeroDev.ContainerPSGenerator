@@ -6,6 +6,9 @@
 >
 > **Target Platform:** PowerShell 7.4+, Docker
 
+The generator and every generated module manifest declare PowerShell 7.4 as their
+minimum supported runtime.
+
 ---
 
 # Purpose

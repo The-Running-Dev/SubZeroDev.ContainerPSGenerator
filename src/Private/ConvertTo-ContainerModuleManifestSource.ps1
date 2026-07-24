@@ -17,6 +17,7 @@ function ConvertTo-ContainerModuleManifestSource {
 @{
     RootModule        = '$($Model.ModuleName).psm1'
     ModuleVersion     = '$($Model.ModuleVersion)'
+    PowerShellVersion = '7.4'
     FunctionsToExport = $functionsToExport
     CmdletsToExport   = @()
     VariablesToExport = @()

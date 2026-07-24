@@ -4,7 +4,7 @@
     GUID              = 'a9ea0718-3a9b-4693-a647-b5472923f3f5'
     Author            = 'SubZeroDev'
     Description       = 'Generates repository-specific PowerShell modules for containerized applications.'
-    PowerShellVersion = '7.0'
+    PowerShellVersion = '7.4'
 
     FunctionsToExport = @(
         'Build-ContainerModule'
