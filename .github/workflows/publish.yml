@@ -1,0 +1,56 @@
+name: Publish
+
+on:
+  release:
+    types:
+      - published
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  github-packages:
+    name: GitHub Packages
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Validate release version and build package
+        id: package
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:GITHUB_REF_NAME -notmatch '^v(?<Version>\d+\.\d+\.\d+)$') {
+            throw "Release tag '$env:GITHUB_REF_NAME' must use the form v<ModuleVersion>."
+          }
+
+          $releaseVersion = [version] $Matches.Version
+          $manifest = Test-ModuleManifest ./src/SubZeroDev.ContainerPSGenerator.psd1
+          if ($releaseVersion -ne $manifest.Version) {
+            throw "Release tag version '$releaseVersion' does not match module version '$($manifest.Version)'."
+          }
+
+          $package = ./build/Test-GeneratorNuGetPackage.ps1 -InstallDependencies
+          "path=$($package.FullName)" | Add-Content -LiteralPath $env:GITHUB_OUTPUT
+
+      - name: Upload release package
+        uses: actions/upload-artifact@v4
+        with:
+          name: generator-nuget-package
+          path: ${{ steps.package.outputs.path }}
+          if-no-files-found: error
+
+      - name: Publish to GitHub Packages
+        shell: pwsh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          dotnet nuget push '${{ steps.package.outputs.path }}' `
+            --api-key $env:GITHUB_TOKEN `
+            --source 'https://nuget.pkg.github.com/The-Running-Dev/index.json'
+          if ($LASTEXITCODE -ne 0) {
+            throw "Publishing the NuGet package failed with exit code $LASTEXITCODE."
+          }
