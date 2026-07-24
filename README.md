@@ -53,7 +53,9 @@ quality gates, inspector hardening, broader real-container mapping coverage,
 operational documentation, and release preparation. The public plugin SDK and
 additional container runtimes remain deferred to Phase 2.
 
-See [TODO.md](TODO.md) for the complete remaining Version 1 roadmap, release-readiness work, and Phase 2 deferrals.
+See [TODO.md](TODO.md) for the remaining engineering roadmap and
+[docs/TODO.md](docs/TODO.md) for the ordered user, contributor, and release
+documentation backlog.
 
 ## Version 1 workflow
 
