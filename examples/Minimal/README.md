@@ -16,6 +16,11 @@ PowerShell help and the installed Markdown command reference, removes the import
 module and local image, and deletes its generated files. Pass `-KeepArtifacts` to
 retain `examples/Minimal/artifacts` for inspection.
 
+The hosted container test also invokes this example with argument, environment,
+bind-mount, port, working-directory, named-volume, generic runtime-option, memory,
+CPU, and secret mappings. Device and GPU mappings remain capability-gated because
+standard runners do not expose that hardware.
+
 ## Run each step manually
 
 ```powershell

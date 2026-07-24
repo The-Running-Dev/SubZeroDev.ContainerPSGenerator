@@ -7,6 +7,8 @@ BeforeAll {
     $installedModulePath = Join-Path $TestDrive 'Installed' 'ExampleContainer'
     $isAct = $env:ACT -eq 'true'
     $mountedRepositoryPath = if ($isAct) { '/tmp' } else { Join-Path $TestDrive 'Repository' }
+    $secretPath = Join-Path $TestDrive 'api-token.txt'
+    $volumeName = 'containerpsgenerator-e2e-' + [guid]::NewGuid().ToString('N')
     $image = 'subzerodev-containerpsgenerator-minimal:local'
 
     if (-not (Get-Command docker -ErrorAction SilentlyContinue)) {
@@ -41,12 +43,14 @@ BeforeAll {
         Set-Content -LiteralPath (Join-Path $mountedRepositoryPath 'README.md') `
             -Value 'mounted-content' -NoNewline
     }
+    Set-Content -LiteralPath $secretPath -Value 'secret-from-e2e' -NoNewline
 }
 
 AfterAll {
     Remove-Module ExampleContainer -Force -ErrorAction SilentlyContinue
     Remove-Module SubZeroDev.ContainerPSGenerator -Force -ErrorAction SilentlyContinue
     & docker image rm --force $image 2>&1 | Out-Null
+    & docker volume rm --force $volumeName 2>&1 | Out-Null
 }
 
 Describe 'Container module end-to-end workflow' {
@@ -95,6 +99,43 @@ Describe 'Container module end-to-end workflow' {
         else {
             $result.MountedReadme | Should -BeTrue
         }
+    }
+
+    It 'runs portable container options through Docker' {
+        $listener = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0)
+        $listener.Start()
+        try {
+            $hostPort = ([Net.IPEndPoint] $listener.LocalEndpoint).Port
+        }
+        finally {
+            $listener.Stop()
+        }
+
+        $result = Invoke-Example `
+            -Repository (Get-Item -LiteralPath $mountedRepositoryPath) `
+            -Message 'mapping-e2e' `
+            -HostPort $hostPort `
+            -WorkingDirectory '/app' `
+            -CacheVolume $volumeName `
+            -Network 'bridge' `
+            -Hostname 'mapping-e2e' `
+            -Memory '256m' `
+            -Cpus 0.5 |
+            ConvertFrom-Json
+
+        $result.WorkingDirectory | Should -Be '/app'
+        $result.CacheWritable | Should -BeTrue
+        $result.Hostname | Should -Be 'mapping-e2e'
+    }
+
+    It 'mounts a host secret through Docker' -Skip:$isAct {
+        $result = Invoke-Example `
+            -Repository (Get-Item -LiteralPath $mountedRepositoryPath) `
+            -Message 'secret-e2e' `
+            -SecretFile (Get-Item -LiteralPath $secretPath) |
+            ConvertFrom-Json
+
+        $result.Secret | Should -BeExactly 'secret-from-e2e'
     }
 
     It 'provides generated help and previews without running Docker' {

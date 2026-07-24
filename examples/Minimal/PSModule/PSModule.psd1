@@ -92,6 +92,14 @@
                     )
                 }
                 @{
+                    Name = 'Hostname'
+                    Description = 'Optional hostname assigned through a generic Docker runtime option.'
+                    Type = 'string'
+                    Mappings = @(
+                        @{ Type = 'RuntimeOption'; Name = '--hostname' }
+                    )
+                }
+                @{
                     Name = 'Device'
                     Description = 'Optional host device exposed read-write inside the container.'
                     Type = 'FileInfo'
@@ -113,6 +121,14 @@
                     Type = 'string'
                     Mappings = @(
                         @{ Type = 'ResourceLimit'; Resource = 'Memory' }
+                    )
+                }
+                @{
+                    Name = 'Cpus'
+                    Description = 'Optional container CPU limit.'
+                    Type = 'double'
+                    Mappings = @(
+                        @{ Type = 'ResourceLimit'; Resource = 'Cpus' }
                     )
                 }
                 @{

@@ -66,7 +66,7 @@ Complete these in order so every inspector follows the same policy:
 
 ## 4. End-to-end behavior
 
-- [ ] Exercise argument, environment, mount, port, working-directory, volume,
+- [x] Exercise argument, environment, mount, port, working-directory, volume,
   resource-limit, secret, and runtime-option mappings in the real container test.
 - [ ] Exercise device and GPU mappings only on runners that expose the required host
   capabilities; do not make unavailable hardware an MVP blocker.
